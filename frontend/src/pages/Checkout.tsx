@@ -1,0 +1,93 @@
+import { useQuery } from "@tanstack/react-query";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { apiClient } from "../api/client";
+
+const TERMINAL = ["PAID", "EXPIRED", "FAILED", "CANCELED"];
+
+const statusLabel: Record<string, string> = {
+  PENDING: "等待支付",
+  PAID: "支付成功",
+  EXPIRED: "已超时",
+  FAILED: "支付失败",
+  CANCELED: "已取消",
+};
+
+export default function Checkout() {
+  const { id } = useParams<{ id: string }>();
+  const nav = useNavigate();
+
+  const { data: order, isLoading } = useQuery({
+    queryKey: ["order", id],
+    queryFn: () => apiClient.order(id!),
+    // Poll until the order reaches a terminal state.
+    refetchInterval: (q) => (TERMINAL.includes(q.state.data?.status ?? "") ? false : 4000),
+  });
+
+  if (isLoading) return <p>加载中…</p>;
+  if (!order) return <p>订单不存在</p>;
+
+  // Placeholder mode: backend returned a checkout_url on our own origin.
+  const isPlaceholder = !order.checkout_url || order.checkout_url.startsWith(location.origin);
+  const isTerminal = TERMINAL.includes(order.status);
+
+  return (
+    <div className="max-w-lg mx-auto bg-white border rounded-lg p-6">
+      <h1 className="text-xl font-bold mb-2">订单收银台</h1>
+      <p className="text-sm text-slate-500 mb-4 font-mono">{order.order_id}</p>
+
+      <div className="space-y-1 text-sm mb-4">
+        <p>套餐：{order.plan_code}</p>
+        <p>金额：{order.amount} {order.currency}（≈ {order.amount} USDT）</p>
+        <p>
+          状态：<span className={order.status === "PAID" ? "text-green-600 font-medium" : ""}>
+            {statusLabel[order.status] || order.status}
+          </span>
+        </p>
+        {order.expires_at && <p>有效期至：{new Date(order.expires_at).toLocaleString()}</p>}
+      </div>
+
+      {/* Terminal states */}
+      {order.status === "PAID" && (
+        <div className="bg-green-50 border border-green-200 text-green-800 text-sm rounded p-4 mb-4">
+          支付成功，会员已开通！
+          <button onClick={() => nav("/account/subscription")} className="ml-2 underline">
+            查看订阅
+          </button>
+        </div>
+      )}
+      {(order.status === "EXPIRED" || order.status === "FAILED") && (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded p-4 mb-4">
+          订单{statusLabel[order.status]}，请
+          <Link to="/membership" className="underline ml-1">重新下单</Link>。
+        </div>
+      )}
+
+      {/* Pending: real hosted checkout vs placeholder */}
+      {!isTerminal && isPlaceholder && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded p-4 mb-4">
+          占位收银台（后端未配置 UPay）。配置 <code>UPAY_API_KEY</code> 后这里会内嵌真实 USDT 收银台。
+        </div>
+      )}
+      {!isTerminal && !isPlaceholder && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2 text-sm">
+            <span className="text-slate-500">在下方完成 USDT 支付，页面会自动刷新状态</span>
+            <a href={order.checkout_url!} target="_blank" rel="noreferrer" className="text-indigo-600">
+              在新标签打开 ↗
+            </a>
+          </div>
+          {/* UPay 托管收银台；若被 CSP/X-Frame-Options 拦截，用上方“新标签打开” */}
+          <iframe
+            src={order.checkout_url!}
+            title="UPay Checkout"
+            className="w-full h-[480px] border rounded"
+          />
+        </div>
+      )}
+
+      <Link to="/account/orders" className="text-indigo-600 text-sm">
+        ← 返回订单列表
+      </Link>
+    </div>
+  );
+}

@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS webhook_events;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS subscriptions;
+DROP TABLE IF EXISTS membership_plans;
+DROP TABLE IF EXISTS users;

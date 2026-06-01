@@ -1,0 +1,211 @@
+package handler
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+	"time"
+
+	"chldemo/internal/middleware"
+	"chldemo/internal/repo"
+	"chldemo/internal/upay"
+
+	"github.com/labstack/echo/v4"
+)
+
+// memberView computes membership status from a subscription.
+func memberView(s repo.Subscription, found bool) map[string]any {
+	status := "none"
+	var expires *time.Time
+	daysLeft := 0
+	if found && s.ExpiresAt != nil {
+		expires = s.ExpiresAt
+		if s.ExpiresAt.After(time.Now()) {
+			status = "active"
+			daysLeft = int(time.Until(*s.ExpiresAt).Hours() / 24)
+		} else {
+			status = "expired"
+		}
+	}
+	return map[string]any{
+		"tier":       "super",
+		"status":     status,
+		"expires_at": expires,
+		"days_left":  daysLeft,
+	}
+}
+
+func (h *Handler) Me(c echo.Context) error {
+	uid := middleware.UserID(c)
+	u, err := h.repo.GetUserByID(c.Request().Context(), uid)
+	if err != nil {
+		return fail(c, http.StatusUnauthorized, "unauthorized", "user not found")
+	}
+	sub, found, _ := h.repo.GetSubscription(c.Request().Context(), uid)
+	return ok(c, map[string]any{
+		"email":      u.Email,
+		"created_at": u.CreatedAt,
+		"member":     memberView(sub, found),
+	})
+}
+
+func (h *Handler) Subscription(c echo.Context) error {
+	uid := middleware.UserID(c)
+	sub, found, err := h.repo.GetSubscription(c.Request().Context(), uid)
+	if err != nil {
+		return fail(c, http.StatusInternalServerError, "internal", "query failed")
+	}
+	return ok(c, memberView(sub, found))
+}
+
+func (h *Handler) ListPlans(c echo.Context) error {
+	plans, err := h.repo.ListPlans(c.Request().Context())
+	if err != nil {
+		return fail(c, http.StatusInternalServerError, "internal", "query failed")
+	}
+	out := make([]map[string]any, 0, len(plans))
+	for _, p := range plans {
+		out = append(out, map[string]any{
+			"code": p.Code, "name": p.Name, "amount": p.Amount,
+			"currency": p.Currency, "duration_days": p.DurationDays,
+		})
+	}
+	return ok(c, out)
+}
+
+func orderView(o repo.Order) map[string]any {
+	return map[string]any{
+		"order_id":        o.MerchantOrderID,
+		"upay_payment_id": o.UpayPaymentID,
+		"plan_code":       o.PlanCode,
+		"amount":          o.Amount,
+		"currency":        o.Currency,
+		"status":          o.Status,
+		"received_amount": o.ReceivedAmount,
+		"failure_code":    o.FailureCode,
+		"checkout_url":    o.CheckoutURL,
+		"created_at":      o.CreatedAt,
+		"paid_at":         o.PaidAt,
+		"expires_at":      o.ExpiresAt,
+	}
+}
+
+// CreateOrder (v0.0.1): persists a PENDING order and returns a placeholder
+// checkout URL. Real UPay order creation lands in v0.0.2.
+func (h *Handler) CreateOrder(c echo.Context) error {
+	uid := middleware.UserID(c)
+	var in struct {
+		PlanCode string `json:"plan_code"`
+	}
+	if err := c.Bind(&in); err != nil {
+		return fail(c, http.StatusBadRequest, "invalid_request", "malformed body")
+	}
+
+	plan, err := h.repo.GetPlan(c.Request().Context(), in.PlanCode)
+	if errors.Is(err, repo.ErrNotFound) {
+		return fail(c, http.StatusBadRequest, "plan_not_found", "unknown plan_code")
+	}
+	if err != nil {
+		return fail(c, http.StatusInternalServerError, "internal", "query failed")
+	}
+
+	ctx := c.Request().Context()
+
+	// Reuse an existing open UPay order to avoid duplicate checkouts (real mode only).
+	if h.upay != nil {
+		if ord, err := h.repo.ReuseOpenOrder(ctx, uid); err == nil && ord.CheckoutURL != nil {
+			return ok(c, map[string]any{
+				"order_id": ord.MerchantOrderID, "checkout_url": *ord.CheckoutURL,
+				"expires_at": ord.ExpiresAt, "reused": true,
+			})
+		}
+	}
+
+	moid := randID("sub_")
+	idemKey := moid + ":create"
+
+	// Persist the local order first (PENDING) so we never lose track of a payment.
+	o := repo.Order{
+		MerchantOrderID: moid,
+		PlanCode:        plan.Code,
+		Amount:          plan.Amount,
+		Currency:        plan.Currency,
+		Status:          "PENDING",
+	}
+	if err := h.repo.CreateOrder(ctx, o, uid, idemKey); err != nil {
+		return fail(c, http.StatusInternalServerError, "internal", "create order failed")
+	}
+
+	// Placeholder mode: no UPay configured (keeps local dev working without NetBird).
+	if h.upay == nil {
+		expires := time.Now().Add(30 * time.Minute)
+		checkout := h.cfg.PublicBaseURL + "/checkout/" + moid
+		_ = h.repo.AttachUpayResult(ctx, moid, "", checkout, &expires)
+		return ok(c, map[string]any{
+			"order_id": moid, "checkout_url": checkout, "expires_at": expires,
+			"note": "占位收银台（未配置 UPay）；配置 UPAY_API_KEY 后启用真实支付",
+		})
+	}
+
+	// Real mode: create the UPay order and attach its checkout URL.
+	resultURL := h.cfg.PublicBaseURL + "/checkout/" + moid + "/result"
+	up, err := h.upay.CreateOrder(upay.CreateOrderReq{
+		MerchantOrderID:  moid,
+		Amount:           plan.Amount, // already "20.00" form from numeric::text
+		Currency:         plan.Currency,
+		Description:      plan.Name,
+		ExpiresInSeconds: 1800,
+		SuccessURL:       resultURL,
+		CancelURL:        resultURL,
+		Metadata:         map[string]string{"user_id": fmt.Sprint(uid), "plan_code": plan.Code},
+	}, idemKey)
+	if err != nil {
+		_ = h.repo.MarkOrderTerminal(ctx, "", "FAILED", "")
+		return fail(c, http.StatusBadGateway, "upstream_error", "create UPay order failed: "+err.Error())
+	}
+
+	expiresAt := parseRFC3339(up.ExpiresAt)
+	if err := h.repo.AttachUpayResult(ctx, moid, up.ID, up.CheckoutURL, expiresAt); err != nil {
+		return fail(c, http.StatusInternalServerError, "internal", "attach upay result failed")
+	}
+
+	return ok(c, map[string]any{
+		"order_id": moid, "checkout_url": up.CheckoutURL, "expires_at": up.ExpiresAt,
+	})
+}
+
+// parseRFC3339 returns a *time.Time or nil for empty/invalid input.
+func parseRFC3339(s string) *time.Time {
+	if s == "" {
+		return nil
+	}
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return &t
+	}
+	return nil
+}
+
+func (h *Handler) ListOrders(c echo.Context) error {
+	uid := middleware.UserID(c)
+	orders, err := h.repo.ListOrders(c.Request().Context(), uid)
+	if err != nil {
+		return fail(c, http.StatusInternalServerError, "internal", "query failed")
+	}
+	out := make([]map[string]any, 0, len(orders))
+	for _, o := range orders {
+		out = append(out, orderView(o))
+	}
+	return ok(c, out)
+}
+
+func (h *Handler) GetOrder(c echo.Context) error {
+	uid := middleware.UserID(c)
+	o, err := h.repo.GetOrder(c.Request().Context(), uid, c.Param("id"))
+	if errors.Is(err, repo.ErrNotFound) {
+		return fail(c, http.StatusNotFound, "not_found", "order not found")
+	}
+	if err != nil {
+		return fail(c, http.StatusInternalServerError, "internal", "query failed")
+	}
+	return ok(c, orderView(o))
+}

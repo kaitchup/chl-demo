@@ -1,0 +1,58 @@
+# v0.0.1 deployment（边缘反代用宿主机 nginx，不含 Caddy）。
+#
+# 本 compose 只跑 db / backend / frontend，并把 backend、frontend 分别发布到
+# 127.0.0.1:8080 和 127.0.0.1:8081。对外由宿主机 nginx 反代（见 nginx/chl.conf）：
+#   /api/ -> 127.0.0.1:8080      /  -> 127.0.0.1:8081
+#
+# DB 选项（二选一，改 .env 的 DATABASE_URL）：
+#   A) 用下面自带的 postgres 容器（默认，最省事）。
+#   B) 用宿主机已有 PostgreSQL：注释掉 db 服务，设
+#      DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/chl?sslmode=disable
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: chl
+      POSTGRES_USER: chl
+      POSTGRES_PASSWORD: ${DB_PASS:-chl}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chl -d chl"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ../backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://chl:${DB_PASS:-chl}@db:5432/chl?sslmode=disable}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_TTL: 24h
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
+      # UPay (v0.0.2)。留空 = 占位模式；填上才启用真实支付。
+      UPAY_BASE_URL: ${UPAY_BASE_URL:-}
+      UPAY_API_KEY: ${UPAY_API_KEY:-}
+      UPAY_WEBHOOK_SECRET: ${UPAY_WEBHOOK_SECRET:-}
+      UPAY_CA_CERT: ${UPAY_CA_CERT:-}
+      RECONCILE_INTERVAL: ${RECONCILE_INTERVAL:-60s}
+    volumes:
+      - ../certs/upay-local-ca.crt:/app/upay-local-ca.crt:ro  # UPay 自签 CA（NetBird 测试环境）
+    ports:
+      - "127.0.0.1:8080:8080"   # 仅本机可达，由宿主 nginx 反代到 /api
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # 让 backend 能连宿主机 PostgreSQL（选项 B）
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ../frontend
+    ports:
+      - "127.0.0.1:8081:80"     # 容器内 nginx 提供静态文件，仅本机可达，宿主 nginx 反代到 /
+    restart: unless-stopped
+
+volumes:
+  pgdata:
