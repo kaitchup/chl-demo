@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"chldemo/internal/middleware"
@@ -73,6 +74,20 @@ func (h *Handler) ListPlans(c echo.Context) error {
 	return ok(c, out)
 }
 
+// displayStatus derives a read-only status for the UI. UPay no longer has an
+// EXPIRED status (chain arrival stays authoritative, so the row stays PENDING and
+// reconcile keeps polling — a late on-chain payment can still activate it). For
+// display only, an unpaid order past its deadline is surfaced as EXPIRED without
+// mutating the DB.
+func displayStatus(o repo.Order) string {
+	if o.Status == "PENDING" && o.ExpiresAt != nil && o.ExpiresAt.Before(time.Now()) {
+		if amt, err := strconv.ParseFloat(o.ReceivedAmount, 64); err == nil && amt == 0 {
+			return "EXPIRED"
+		}
+	}
+	return o.Status
+}
+
 func orderView(o repo.Order) map[string]any {
 	return map[string]any{
 		"order_id":        o.MerchantOrderID,
@@ -80,7 +95,7 @@ func orderView(o repo.Order) map[string]any {
 		"plan_code":       o.PlanCode,
 		"amount":          o.Amount,
 		"currency":        o.Currency,
-		"status":          o.Status,
+		"status":          displayStatus(o),
 		"received_amount": o.ReceivedAmount,
 		"failure_code":    o.FailureCode,
 		"checkout_url":    o.CheckoutURL,
