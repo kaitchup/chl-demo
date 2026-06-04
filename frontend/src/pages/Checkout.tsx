@@ -69,19 +69,22 @@ export default function Checkout() {
         </div>
       )}
       {!isTerminal && !isPlaceholder && (
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2 text-sm">
-            <span className="text-slate-500">在下方完成 USDT 支付，页面会自动刷新状态</span>
-            <a href={order.checkout_url!} target="_blank" rel="noreferrer" className="text-indigo-600">
-              在新标签打开 ↗
-            </a>
-          </div>
-          {/* UPay 托管收银台；若被 CSP/X-Frame-Options 拦截，用上方“新标签打开” */}
-          <iframe
-            src={order.checkout_url!}
-            title="UPay Checkout"
-            className="w-full h-[480px] border rounded"
-          />
+        <div className="mb-4 space-y-3">
+          <p className="text-sm text-slate-500">
+            点击下方按钮前往 UPay 安全收银台完成 USDT 支付。支付完成后会自动跳回本页，会员将在数秒内开通。
+          </p>
+          {/* UPay 托管收银台不能 iframe 内嵌：其会话 Cookie 是 SameSite=Lax/Strict，
+              在跨站 iframe（第三方上下文）里会被浏览器拒收，页面会空白。改为整页跳转，
+              付款后 UPay 经 success_url 跳回 /checkout/:id/result，由轮询接管开通。 */}
+          <a
+            href={order.checkout_url!}
+            className="block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded py-3"
+          >
+            前往 UPay 收银台支付 →
+          </a>
+          <p className="text-xs text-slate-400">
+            收银台为 UPay 托管页面，需在其自有域名下打开；本页会持续轮询订单状态。
+          </p>
         </div>
       )}
 

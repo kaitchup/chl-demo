@@ -551,7 +551,7 @@ const { data } = useQuery({
 ```yaml
 services:
   db:
-    image: postgres:16
+    image: postgres:17-alpine
     environment: { POSTGRES_DB: chl, POSTGRES_USER: chl, POSTGRES_PASSWORD: ${DB_PASS} }
     volumes: [ "pgdata:/var/lib/postgresql/data" ]
   backend:

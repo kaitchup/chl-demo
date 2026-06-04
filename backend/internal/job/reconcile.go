@@ -45,7 +45,7 @@ func (j *Reconciler) tick(ctx context.Context) {
 		return
 	}
 	for _, o := range pending {
-		if o.UpayPaymentID == nil {
+		if o.UpayPaymentID == nil || *o.UpayPaymentID == "" {
 			continue
 		}
 		up, err := j.upay.GetOrder(*o.UpayPaymentID)

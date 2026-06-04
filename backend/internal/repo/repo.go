@@ -212,8 +212,10 @@ func scanOrder(s scanner) (Order, error) {
 
 // AttachUpayResult stores the UPay order id / checkout url / expiry on a local order.
 func (r *Repo) AttachUpayResult(ctx context.Context, moid, payID, checkoutURL string, expiresAt *time.Time) error {
+	// NULLIF keeps placeholder-mode orders (empty payID) out of the reconcile set,
+	// which filters on upay_payment_id IS NOT NULL.
 	_, err := r.pool.Exec(ctx,
-		`UPDATE orders SET upay_payment_id=$2, checkout_url=$3, expires_at=$4
+		`UPDATE orders SET upay_payment_id=NULLIF($2,''), checkout_url=$3, expires_at=$4
 		   WHERE merchant_order_id=$1`,
 		moid, payID, checkoutURL, expiresAt)
 	return err
@@ -243,7 +245,7 @@ func (r *Repo) ListPendingOrders(ctx context.Context) ([]Order, error) {
 		`SELECT merchant_order_id, upay_payment_id, plan_code, amount::text, currency,
 		        status, received_amount::text, failure_code, checkout_url,
 		        created_at, paid_at, expires_at
-		   FROM orders WHERE status='PENDING' AND upay_payment_id IS NOT NULL`)
+		   FROM orders WHERE status='PENDING' AND upay_payment_id IS NOT NULL AND upay_payment_id <> ''`)
 	if err != nil {
 		return nil, err
 	}
@@ -272,11 +274,12 @@ func (r *Repo) InsertWebhookEvent(ctx context.Context, eventID, payID, eventType
 	return tag.RowsAffected() == 1, nil
 }
 
-// MarkOrderTerminal sets a non-paid terminal status (EXPIRED/FAILED) found by reconcile.
-func (r *Repo) MarkOrderTerminal(ctx context.Context, payID, status, failureCode string) error {
+// MarkOrderTerminal sets a non-paid terminal status (CANCELED) found by reconcile;
+// reason carries UPay's cancel_reason (stored in failure_code).
+func (r *Repo) MarkOrderTerminal(ctx context.Context, payID, status, reason string) error {
 	var fc *string
-	if failureCode != "" {
-		fc = &failureCode
+	if reason != "" {
+		fc = &reason
 	}
 	_, err := r.pool.Exec(ctx,
 		`UPDATE orders SET status=$2, failure_code=$3

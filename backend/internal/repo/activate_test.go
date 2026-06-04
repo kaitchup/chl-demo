@@ -12,7 +12,8 @@ import (
 
 // Integration test for ActivateMembership. Skipped unless TEST_DATABASE_URL is
 // set (so it never breaks CI without a database). Run locally:
-//   TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5432/chl?sslmode=disable" go test ./internal/repo/ -run Activate -v
+//
+//	TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5432/chl?sslmode=disable" go test ./internal/repo/ -run Activate -v
 func TestActivateMembership(t *testing.T) {
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {

@@ -35,12 +35,16 @@ func (s *PaymentService) Sync(ctx context.Context, o *upay.Order) error {
 }
 
 func (s *PaymentService) apply(ctx context.Context, o *upay.Order) error {
+	// UPay lifecycle status (per gateway docs): INITED | PROCESSING | SUCCEEDED | CANCELED.
+	// Funding/refund progress is NOT carried by status — judge it from received_amount.
+	// Expiry is no longer a status: an "expired" local order can still settle on-chain,
+	// so we keep polling until UPay reports SUCCEEDED or CANCELED.
 	switch o.Status {
-	case "PAID":
+	case "SUCCEEDED":
 		return s.repo.ActivateMembership(ctx, o.ID, parseTime(o.PaidAt))
-	case "EXPIRED", "FAILED":
-		return s.repo.MarkOrderTerminal(ctx, o.ID, o.Status, o.FailureCode)
-	default: // INITED / AWAITING_PAYMENT / partial
+	case "CANCELED":
+		return s.repo.MarkOrderTerminal(ctx, o.ID, "CANCELED", o.CancelReason)
+	default: // INITED / PROCESSING — record any partial arrival, stay PENDING
 		if o.ReceivedAmount != "" {
 			return s.repo.UpdateReceived(ctx, o.ID, o.ReceivedAmount)
 		}

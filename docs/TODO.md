@@ -6,7 +6,8 @@
 
 - [~] **v0.0.2 接入 UPay 真实支付**（代码已就绪，待真实环境联调）
   - [x] 创建订单调 UPay `POST /v1/payment/request`（`Idempotency-Key`、`metadata` 存 user_id/plan_code）
-  - [x] 收银台页内嵌 `checkout_url`（iframe + 新标签兜底）+ 轮询订单状态到终态
+  - [x] 收银台页跳转 `checkout_url` + 轮询订单状态到终态
+  - [x] **收银台改为整页跳转，不再用 iframe 内嵌**：UPay 托管收银台 SPA（`checkout.upay.local`）的会话 Cookie `cks_cs_*` 是 `SameSite=Lax/Strict`，iframe 内嵌属跨站第三方上下文会被浏览器拒收 → 页面空白。改为点击按钮整页跳到 `checkout_url`，付款后经 `success_url` 跳回 `/checkout/:id/result`，由轮询接管开通（同 Stripe Checkout 的做法）。改在 `frontend/src/pages/Checkout.tsx`
   - [x] 回调 `POST /api/webhooks/upay`：**HMAC-SHA256 验签**（原始字节、5 分钟防重放、双签兼容、event.id 幂等）— 含单元测试
   - [x] 轮询兜底定时任务（超时 EXPIRED / 失败 FAILED 不发回调，只能轮询发现）
   - [x] 回调/轮询命中后开通会员（事务 + 行锁 + `applied_to_subscription` 幂等）

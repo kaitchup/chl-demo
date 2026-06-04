@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { apiClient } from "../api/client";
@@ -9,6 +10,40 @@ const statusLabel: Record<string, string> = {
   CANCELED: "已取消",
   FAILED: "失败",
 };
+
+// shorten keeps the first/last 8 chars and elides the middle, so the order id
+// stays recognizable while fitting the column.
+function shorten(id: string): string {
+  return id.length <= 16 ? id : `${id.slice(0, 8)}…${id.slice(-8)}`;
+}
+
+// OrderId renders the elided id with a click-to-copy button for the full value.
+function OrderId({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable (e.g. non-secure context) — ignore */
+    }
+  };
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="font-mono text-xs" title={id}>
+        {shorten(id)}
+      </span>
+      <button
+        onClick={copy}
+        title="复制完整订单号"
+        className="text-slate-400 hover:text-indigo-600 text-xs"
+      >
+        {copied ? "已复制" : "复制"}
+      </button>
+    </span>
+  );
+}
 
 export default function Orders() {
   const { data: orders, isLoading } = useQuery({ queryKey: ["orders"], queryFn: apiClient.orders });
@@ -33,7 +68,7 @@ export default function Orders() {
           <tbody>
             {orders?.map((o) => (
               <tr key={o.order_id} className="border-t">
-                <td className="px-4 py-2 font-mono text-xs">{o.order_id.slice(0, 16)}…</td>
+                <td className="px-4 py-2"><OrderId id={o.order_id} /></td>
                 <td className="px-4 py-2">{o.plan_code}</td>
                 <td className="px-4 py-2">{o.amount} {o.currency}</td>
                 <td className="px-4 py-2">{statusLabel[o.status] || o.status}</td>
