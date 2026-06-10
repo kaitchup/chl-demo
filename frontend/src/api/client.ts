@@ -56,6 +56,26 @@ export interface Order {
   expires_at: string | null;
 }
 
+export interface Refund {
+  refund_id: string;
+  upay_refund_id: string | null;
+  order_id: string;
+  amount: string;
+  coin: string;
+  chain: string;
+  to_address: string;
+  status: string;
+  reason: string;
+  created_at: string;
+}
+
+export interface CreateRefundReq {
+  coin: string;
+  chain: string;
+  to_address: string;
+  reason?: string;
+}
+
 export const apiClient = {
   register: (email: string, password: string) =>
     api.post("/auth/register", { email, password }).then((r) => unwrap<{ token: string }>(r.data)),
@@ -68,6 +88,12 @@ export const apiClient = {
     api.post("/orders", { plan_code }).then((r) => unwrap<{ order_id: string; checkout_url: string }>(r.data)),
   orders: () => api.get("/orders").then((r) => unwrap<Order[]>(r.data)),
   order: (id: string) => api.get(`/orders/${id}`).then((r) => unwrap<Order>(r.data)),
+  createRefund: (orderId: string, data: CreateRefundReq) =>
+    api.post(`/orders/${orderId}/refunds`, data).then((r) => unwrap<Refund>(r.data)),
+  listOrderRefunds: (orderId: string) =>
+    api.get(`/orders/${orderId}/refunds`).then((r) => unwrap<Refund[]>(r.data)),
+  getRefund: (refundId: string) =>
+    api.get(`/refunds/${refundId}`).then((r) => unwrap<Refund>(r.data)),
 };
 
 export default api;

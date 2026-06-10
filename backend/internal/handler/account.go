@@ -164,7 +164,7 @@ func (h *Handler) CreateOrder(c echo.Context) error {
 
 	// Real mode: create the UPay order and attach its checkout URL.
 	resultURL := h.cfg.PublicBaseURL + "/checkout/" + moid + "/result"
-	up, err := h.upay.CreateOrder(upay.CreateOrderReq{
+	reqBody, respBody, up, err := h.upay.CreateOrder(upay.CreateOrderReq{
 		MerchantOrderID:  moid,
 		Amount:           plan.Amount, // already "20.00" form from numeric::text
 		Currency:         plan.Currency,
@@ -174,6 +174,7 @@ func (h *Handler) CreateOrder(c echo.Context) error {
 		CancelURL:        resultURL,
 		Metadata:         map[string]string{"user_id": fmt.Sprint(uid), "plan_code": plan.Code},
 	}, idemKey)
+	_ = h.repo.SaveUpayBodies(ctx, moid, reqBody, respBody)
 	if err != nil {
 		_ = h.repo.MarkOrderTerminal(ctx, "", "FAILED", "")
 		return fail(c, http.StatusBadGateway, "upstream_error", "create UPay order failed: "+err.Error())

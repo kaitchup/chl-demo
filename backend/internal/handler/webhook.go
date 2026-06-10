@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"time"
@@ -10,13 +11,23 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// UpayWebhook receives UPay events. Order: read raw body -> verify signature ->
-// dedupe by event.id -> on paid, re-fetch authoritative state and activate.
-// Always returns 2xx quickly on success (UPay only reads the status code).
+// UpayWebhook receives UPay events. Order: read raw body -> save raw log ->
+// verify signature -> dedupe by event.id -> on paid, re-fetch authoritative
+// state and activate. Always returns 2xx quickly on success.
 func (h *Handler) UpayWebhook(c echo.Context) error {
 	raw, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return c.NoContent(http.StatusBadRequest)
+	}
+
+	ctx := c.Request().Context()
+
+	// 0) Persist raw headers + body immediately, before any validation that
+	//    might short-circuit the handler (bad sig, parse error, etc.).
+	hdrJSON, _ := json.Marshal(c.Request().Header)
+	rawLogID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, raw)
+	if err != nil {
+		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	if h.payment == nil {
@@ -36,10 +47,8 @@ func (h *Handler) UpayWebhook(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	ctx := c.Request().Context()
-
 	// 3) Idempotent dedupe on event.id (delivery is at-least-once).
-	inserted, err := h.repo.InsertWebhookEvent(ctx, evt.ID, evt.Data.ID, evt.Event, raw)
+	inserted, err := h.repo.InsertWebhookEvent(ctx, evt.ID, evt.Data.ID, evt.Event, raw, rawLogID)
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -55,5 +64,7 @@ func (h *Handler) UpayWebhook(c echo.Context) error {
 		}
 	}
 	// partially_paid / others: recorded above, order stays PENDING.
+
+	_ = h.repo.MarkWebhookProcessed(ctx, evt.ID)
 	return c.NoContent(http.StatusOK)
 }

@@ -81,6 +81,9 @@ func main() {
 	auth.POST("/orders", h.CreateOrder)
 	auth.GET("/orders", h.ListOrders)
 	auth.GET("/orders/:id", h.GetOrder)
+	auth.POST("/orders/:id/refunds", h.CreateRefund)
+	auth.GET("/orders/:id/refunds", h.ListOrderRefunds)
+	auth.GET("/refunds/:id", h.GetRefund)
 
 	port := os.Getenv("PORT")
 	if port == "" {

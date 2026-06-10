@@ -12,21 +12,21 @@
   - [x] 轮询兜底定时任务（超时 EXPIRED / 失败 FAILED 不发回调，只能轮询发现）
   - [x] 回调/轮询命中后开通会员（事务 + 行锁 + `applied_to_subscription` 幂等）
   - [x] 双模式：未配 `UPAY_API_KEY` 回退占位收银台（本地无 NetBird 可跑）
-  - [ ] **联调**：在能访问 UPay（NetBird）的环境用真实 `sk_test_` 凭据跑通下单→收银台→回调→开通
-  - [ ] **核对 `signing_secret` 验签口径**（整串 `whsec_` vs 剥前缀/解码）——用一条真实回调样本固化（TECH §6.2 注）
+  - [x] **联调**：在能访问 UPay（NetBird）的环境用真实 `sk_test_` 凭据跑通下单→收银台→回调→开通
+  - [x] **核对 `signing_secret` 验签口径**（整串 `whsec_` vs 剥前缀/解码）——用一条真实回调样本固化（TECH §6.2 注）
   - 依赖：UPay 测试环境仅经 NetBird VPN 可达；CA 在 [`certs/upay-local-ca.crt`](../certs/upay-local-ca.crt)
   - 设计细节见 [TECH-DESIGN-技术方案.md](TECH-DESIGN-技术方案.md) §6 / §9
 
 ## 部署 / 运维
 
-- [ ] **1. 用 nginx + docker-compose 部署到 hostVDS**
+- [x] **1. 用 nginx + docker-compose 部署到 hostVDS**
   - VDS：`185.92.181.220`，建议 Ubuntu 22.04/24.04 LTS，装 Docker + compose 插件
   - 起容器：`cd deploy && cp .env.example .env`（改 `JWT_SECRET`/`DB_PASS`/`PUBLIC_BASE_URL`）→ `docker compose up -d --build`
   - 容器只绑 `127.0.0.1`（backend:8080 / frontend:8081），由宿主机 nginx 反代
   - nginx：`deploy/nginx/chl.conf` → `/etc/nginx/sites-available/`，`/api/`→8080、`/`→8081
   - 自检：`curl http://127.0.0.1:8080/api/healthz`
 
-- [ ] **2. 购买域名 + HTTPS 证书，指向 hostVDS `185.92.181.220`**
+- [x] **2. 购买域名 + HTTPS 证书，指向 hostVDS `185.92.181.220`**
   - 买域名（如 `pay.example.com`），加 **A 记录 → 185.92.181.220**
   - 证书二选一（与第 3 项 Cloudflare 方案相关，见下方「注意」）：
     - 不挂 CF：`sudo certbot --nginx -d pay.example.com`（Let's Encrypt 自动签 + 80→443 跳转）

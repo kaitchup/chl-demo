@@ -18,6 +18,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASS:-chl}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"   # 仅本机可达，供宿主机 pgcli 连接
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U chl -d chl"]
       interval: 5s

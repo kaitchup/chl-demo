@@ -55,6 +55,21 @@ type Order struct {
 	ExpiresAt       *time.Time
 }
 
+type Refund struct {
+	ID               int64
+	MerchantRefundID string
+	UpayRefundID     *string
+	MerchantOrderID  string
+	UserID           int64
+	Amount           string
+	Coin             string
+	Chain            string
+	ToAddress        string
+	Status           string
+	Reason           string
+	CreatedAt        time.Time
+}
+
 func isUnique(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
@@ -210,6 +225,16 @@ func scanOrder(s scanner) (Order, error) {
 
 // ---- v0.0.2: UPay integration ----
 
+// SaveUpayBodies stores the raw request and response JSON sent to / received from UPay.
+// Called after CreateOrder regardless of success; req/resp may be nil if the call
+// never reached the wire.
+func (r *Repo) SaveUpayBodies(ctx context.Context, moid string, req, resp []byte) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE orders SET upay_req_body=$2, upay_resp_body=$3 WHERE merchant_order_id=$1`,
+		moid, req, resp)
+	return err
+}
+
 // AttachUpayResult stores the UPay order id / checkout url / expiry on a local order.
 func (r *Repo) AttachUpayResult(ctx context.Context, moid, payID, checkoutURL string, expiresAt *time.Time) error {
 	// NULLIF keeps placeholder-mode orders (empty payID) out of the reconcile set,
@@ -261,17 +286,46 @@ func (r *Repo) ListPendingOrders(ctx context.Context) ([]Order, error) {
 	return out, rows.Err()
 }
 
+// SaveRawWebhook persists raw request headers and body before any processing.
+// Returns the generated log id, which should be threaded into InsertWebhookEvent.
+func (r *Repo) SaveRawWebhook(ctx context.Context, headers, rawBody []byte) (int64, error) {
+	var id int64
+	err := r.pool.QueryRow(ctx,
+		`INSERT INTO webhook_raw_log(req_headers, raw_body) VALUES($1, $2) RETURNING id`,
+		headers, rawBody,
+	).Scan(&id)
+	return id, err
+}
+
 // InsertWebhookEvent records an event; returns inserted=false if the event id was
 // already seen (idempotent dedupe via UNIQUE(upay_event_id)).
-func (r *Repo) InsertWebhookEvent(ctx context.Context, eventID, payID, eventType string, payload []byte) (inserted bool, err error) {
+func (r *Repo) InsertWebhookEvent(ctx context.Context, eventID, payID, eventType string, payload []byte, rawLogID int64) (inserted bool, err error) {
 	tag, err := r.pool.Exec(ctx,
-		`INSERT INTO webhook_events(upay_event_id, upay_payment_id, event_type, payload, signature_valid)
-		 VALUES($1,$2,$3,$4,true) ON CONFLICT (upay_event_id) DO NOTHING`,
-		eventID, payID, eventType, payload)
+		`INSERT INTO webhook_events(upay_event_id, upay_payment_id, event_type, payload, signature_valid, raw_log_id)
+		 VALUES($1,$2,$3,$4,true,$5) ON CONFLICT (upay_event_id) DO NOTHING`,
+		eventID, payID, eventType, payload, rawLogID)
 	if err != nil {
 		return false, err
 	}
 	return tag.RowsAffected() == 1, nil
+}
+
+// MarkWebhookProcessed flips processed=true once the event has been fully handled.
+func (r *Repo) MarkWebhookProcessed(ctx context.Context, eventID string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE webhook_events SET processed=true WHERE upay_event_id=$1`, eventID)
+	return err
+}
+
+// MarkOrderExpiredWithError transitions a PENDING order to EXPIRED and records
+// the HTTP status code and raw response body from the failed UPay reconcile call.
+func (r *Repo) MarkOrderExpiredWithError(ctx context.Context, payID string, code int, body []byte) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE orders
+		    SET status='EXPIRED', reconcile_err_code=$2, reconcile_err_body=$3
+		  WHERE upay_payment_id=$1 AND status='PENDING'`,
+		payID, code, body)
+	return err
 }
 
 // MarkOrderTerminal sets a non-paid terminal status (CANCELED) found by reconcile;
@@ -367,4 +421,71 @@ func (r *Repo) ActivateMembership(ctx context.Context, payID string, paidAt time
 	}
 
 	return tx.Commit(ctx)
+}
+
+// ---- refunds ----
+
+// CreateRefund inserts a new refund row. order_id is resolved via merchant_order_id join.
+func (r *Repo) CreateRefund(ctx context.Context, rf Refund) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO refunds(merchant_refund_id, upay_refund_id, order_id, user_id,
+		                     amount, coin, chain, to_address, status, reason)
+		 SELECT $1, $2, o.id, $3, $4, $5, $6, $7, $8, $9
+		   FROM orders o WHERE o.merchant_order_id=$10`,
+		rf.MerchantRefundID, rf.UpayRefundID, rf.UserID,
+		rf.Amount, rf.Coin, rf.Chain, rf.ToAddress, rf.Status, rf.Reason,
+		rf.MerchantOrderID)
+	if isUnique(err) {
+		return ErrConflict
+	}
+	return err
+}
+
+func scanRefund(s scanner, rf *Refund) error {
+	return s.Scan(&rf.MerchantRefundID, &rf.UpayRefundID, &rf.MerchantOrderID, &rf.UserID,
+		&rf.Amount, &rf.Coin, &rf.Chain, &rf.ToAddress, &rf.Status, &rf.Reason, &rf.CreatedAt)
+}
+
+const refundCols = `rf.merchant_refund_id, rf.upay_refund_id, o.merchant_order_id, rf.user_id,
+                    rf.amount::text, rf.coin, rf.chain, rf.to_address, rf.status, rf.reason, rf.created_at`
+
+// GetRefund returns the refund identified by merchant_refund_id, scoped to the user.
+func (r *Repo) GetRefund(ctx context.Context, userID int64, merchantRefundID string) (Refund, error) {
+	var rf Refund
+	row := r.pool.QueryRow(ctx,
+		`SELECT `+refundCols+`
+		   FROM refunds rf
+		   JOIN orders o ON o.id = rf.order_id
+		  WHERE rf.merchant_refund_id=$1 AND rf.user_id=$2`,
+		merchantRefundID, userID)
+	if err := scanRefund(row, &rf); errors.Is(err, pgx.ErrNoRows) {
+		return rf, ErrNotFound
+	} else if err != nil {
+		return rf, err
+	}
+	return rf, nil
+}
+
+// ListRefundsByOrder returns all refunds for a given order, scoped to the user.
+func (r *Repo) ListRefundsByOrder(ctx context.Context, userID int64, merchantOrderID string) ([]Refund, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT `+refundCols+`
+		   FROM refunds rf
+		   JOIN orders o ON o.id = rf.order_id
+		  WHERE o.merchant_order_id=$1 AND rf.user_id=$2
+		  ORDER BY rf.created_at DESC`,
+		merchantOrderID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Refund
+	for rows.Next() {
+		var rf Refund
+		if err := scanRefund(rows, &rf); err != nil {
+			return nil, err
+		}
+		out = append(out, rf)
+	}
+	return out, rows.Err()
 }

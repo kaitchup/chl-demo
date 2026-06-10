@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 
@@ -51,6 +52,12 @@ func (j *Reconciler) tick(ctx context.Context) {
 		up, err := j.upay.GetOrder(*o.UpayPaymentID)
 		if err != nil {
 			log.Printf("reconcile: get %s: %v", *o.UpayPaymentID, err)
+			var apiErr *upay.APIError
+			if errors.As(err, &apiErr) {
+				if dbErr := j.repo.MarkOrderExpiredWithError(ctx, *o.UpayPaymentID, apiErr.StatusCode, apiErr.Body); dbErr != nil {
+					log.Printf("reconcile: mark expired %s: %v", *o.UpayPaymentID, dbErr)
+				}
+			}
 			continue
 		}
 		if err := j.payment.Sync(ctx, up); err != nil {

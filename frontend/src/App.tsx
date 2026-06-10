@@ -6,6 +6,7 @@ import Register from "./pages/Register";
 import Membership from "./pages/Membership";
 import Account from "./pages/Account";
 import Orders from "./pages/Orders";
+import OrderRefunds from "./pages/OrderRefunds";
 import Checkout from "./pages/Checkout";
 
 export default function App() {
@@ -37,6 +38,14 @@ export default function App() {
           element={
             <RequireAuth>
               <Orders />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/account/orders/:id/refunds"
+          element={
+            <RequireAuth>
+              <OrderRefunds />
             </RequireAuth>
           }
         />
