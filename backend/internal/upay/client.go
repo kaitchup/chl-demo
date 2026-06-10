@@ -73,7 +73,7 @@ type Order struct {
 	MerchantOrderID string `json:"merchant_order_id"`
 	Amount          string `json:"amount"`
 	Currency        string `json:"currency"`
-	Status          string `json:"status"`        // INITED | PROCESSING | SUCCEEDED | CANCELED
+	Status          string `json:"status"`        // INITED | PROCESSING | COMPLETED | CANCELED (PAID = compat alias for COMPLETED)
 	ReceivedAmount  string `json:"received_amount"`
 	CancelReason    string `json:"cancel_reason"` // set only on CANCELED orders
 	CheckoutURL     string `json:"checkout_url"`

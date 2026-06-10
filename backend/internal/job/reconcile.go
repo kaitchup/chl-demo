@@ -13,7 +13,7 @@ import (
 
 // Reconciler polls UPay for PENDING orders. It is the *only* way EXPIRED/FAILED
 // orders are discovered (UPay only webhooks on chain arrivals), and it also
-// repairs any PAID order that missed its webhook.
+// repairs any COMPLETED order that missed its webhook.
 type Reconciler struct {
 	repo     *repo.Repo
 	upay     *upay.Client
