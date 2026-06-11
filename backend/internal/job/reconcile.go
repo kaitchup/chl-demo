@@ -40,6 +40,11 @@ func (j *Reconciler) Run(ctx context.Context) {
 }
 
 func (j *Reconciler) tick(ctx context.Context) {
+	j.tickOrders(ctx)
+	j.tickRefunds(ctx)
+}
+
+func (j *Reconciler) tickOrders(ctx context.Context) {
 	pending, err := j.repo.ListPendingOrders(ctx)
 	if err != nil {
 		log.Printf("reconcile: list pending: %v", err)
@@ -62,6 +67,34 @@ func (j *Reconciler) tick(ctx context.Context) {
 		}
 		if err := j.payment.Sync(ctx, up); err != nil {
 			log.Printf("reconcile: sync %s: %v", *o.UpayPaymentID, err)
+		}
+	}
+}
+
+func (j *Reconciler) tickRefunds(ctx context.Context) {
+	pending, err := j.repo.ListPendingRefunds(ctx)
+	if err != nil {
+		log.Printf("reconcile: list pending refunds: %v", err)
+		return
+	}
+	for _, rf := range pending {
+		if rf.UpayRefundID == nil {
+			continue
+		}
+		up, err := j.upay.GetRefund(*rf.UpayRefundID)
+		if err != nil {
+			log.Printf("reconcile: get refund %s: %v", *rf.UpayRefundID, err)
+			continue
+		}
+		switch up.Status {
+		case "CONFIRMED":
+			if err := j.repo.ConfirmRefund(ctx, *rf.UpayRefundID); err != nil {
+				log.Printf("reconcile: confirm refund %s: %v", *rf.UpayRefundID, err)
+			}
+		case "FAILED":
+			if err := j.repo.MarkRefundFailed(ctx, *rf.UpayRefundID); err != nil {
+				log.Printf("reconcile: fail refund %s: %v", *rf.UpayRefundID, err)
+			}
 		}
 	}
 }

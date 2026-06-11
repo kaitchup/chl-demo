@@ -122,6 +122,54 @@ func (h *Handler) GetRefund(c echo.Context) error {
 	return ok(c, refundView(rf))
 }
 
+// SyncRefund: POST /api/refunds/:id/sync
+// Fetches the authoritative refund state from UPay and applies it locally.
+// If the refund is already in a terminal state (CONFIRMED / FAILED), it is a no-op.
+func (h *Handler) SyncRefund(c echo.Context) error {
+	uid := middleware.UserID(c)
+	ctx := c.Request().Context()
+
+	rf, err := h.repo.GetRefund(ctx, uid, c.Param("id"))
+	if errors.Is(err, repo.ErrNotFound) {
+		return fail(c, http.StatusNotFound, "not_found", "refund not found")
+	}
+	if err != nil {
+		return fail(c, http.StatusInternalServerError, "internal", "query failed")
+	}
+
+	if rf.Status == "CONFIRMED" || rf.Status == "FAILED" {
+		v := refundView(rf)
+		v["skipped"] = true
+		return ok(c, v)
+	}
+
+	if h.upay == nil || rf.UpayRefundID == nil {
+		return fail(c, http.StatusServiceUnavailable, "upay_unavailable", "UPay not configured or refund has no UPay id")
+	}
+
+	up, err := h.upay.GetRefund(*rf.UpayRefundID)
+	if err != nil {
+		return fail(c, http.StatusBadGateway, "upstream_error", "get refund failed: "+err.Error())
+	}
+
+	switch up.Status {
+	case "CONFIRMED":
+		if err := h.repo.ConfirmRefund(ctx, *rf.UpayRefundID); err != nil {
+			return fail(c, http.StatusInternalServerError, "internal", "confirm refund failed")
+		}
+		rf.Status = "CONFIRMED"
+	case "FAILED":
+		if err := h.repo.MarkRefundFailed(ctx, *rf.UpayRefundID); err != nil {
+			return fail(c, http.StatusInternalServerError, "internal", "mark failed")
+		}
+		rf.Status = "FAILED"
+	}
+
+	v := refundView(rf)
+	v["skipped"] = false
+	return ok(c, v)
+}
+
 func refundView(rf repo.Refund) map[string]any {
 	return map[string]any{
 		"refund_id":      rf.MerchantRefundID,

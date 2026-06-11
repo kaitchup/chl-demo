@@ -466,6 +466,53 @@ func (r *Repo) GetRefund(ctx context.Context, userID int64, merchantRefundID str
 	return rf, nil
 }
 
+// ListPendingRefunds returns refunds that have a UPay id but are not yet in a
+// terminal state (CONFIRMED or FAILED), for the reconcile job to poll.
+func (r *Repo) ListPendingRefunds(ctx context.Context) ([]Refund, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT `+refundCols+`
+		   FROM refunds rf
+		   JOIN orders o ON o.id = rf.order_id
+		  WHERE rf.upay_refund_id IS NOT NULL
+		    AND rf.status NOT IN ('CONFIRMED','FAILED')`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Refund
+	for rows.Next() {
+		var rf Refund
+		if err := scanRefund(rows, &rf); err != nil {
+			return nil, err
+		}
+		out = append(out, rf)
+	}
+	return out, rows.Err()
+}
+
+// ConfirmRefund updates a refund to CONFIRMED and, if this is the first
+// confirmed refund on the order, flips the order status to REFUNDED.
+func (r *Repo) ConfirmRefund(ctx context.Context, upayRefundID string) error {
+	_, err := r.pool.Exec(ctx,
+		`WITH updated AS (
+		    UPDATE refunds SET status='CONFIRMED'
+		     WHERE upay_refund_id=$1 AND status <> 'CONFIRMED'
+		 RETURNING order_id
+		)
+		UPDATE orders SET status='REFUNDED'
+		  FROM updated
+		 WHERE orders.id = updated.order_id AND orders.status = 'PAID'`,
+		upayRefundID)
+	return err
+}
+
+// MarkRefundFailed updates a refund to FAILED.
+func (r *Repo) MarkRefundFailed(ctx context.Context, upayRefundID string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE refunds SET status='FAILED' WHERE upay_refund_id=$1`, upayRefundID)
+	return err
+}
+
 // ListRefundsByOrder returns all refunds for a given order, scoped to the user.
 func (r *Repo) ListRefundsByOrder(ctx context.Context, userID int64, merchantOrderID string) ([]Refund, error) {
 	rows, err := r.pool.Query(ctx,

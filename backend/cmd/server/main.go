@@ -70,7 +70,7 @@ func main() {
 
 	api := e.Group("/api")
 	api.GET("/healthz", h.Health)
-	api.POST("/auth/register", h.Register)
+	// api.POST("/auth/register", h.Register)
 	api.POST("/auth/login", h.Login)
 	api.GET("/plans", h.ListPlans)
 	api.POST("/webhooks/upay", h.UpayWebhook) // public; authenticated via HMAC signature
@@ -84,6 +84,7 @@ func main() {
 	auth.POST("/orders/:id/refunds", h.CreateRefund)
 	auth.GET("/orders/:id/refunds", h.ListOrderRefunds)
 	auth.GET("/refunds/:id", h.GetRefund)
+	auth.POST("/refunds/:id/sync", h.SyncRefund)
 
 	port := os.Getenv("PORT")
 	if port == "" {
