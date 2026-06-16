@@ -44,6 +44,7 @@ export interface Member {
 }
 
 export interface Order {
+  row_id: number;
   order_id: string;
   plan_code: string;
   amount: string;
@@ -54,6 +55,11 @@ export interface Order {
   created_at: string;
   paid_at: string | null;
   expires_at: string | null;
+}
+
+export interface OrdersPage {
+  orders: Order[];
+  has_more: boolean;
 }
 
 export interface Refund {
@@ -86,7 +92,15 @@ export const apiClient = {
   subscription: () => api.get("/subscription").then((r) => unwrap<Member>(r.data)),
   createOrder: (plan_code: string) =>
     api.post("/orders", { plan_code }).then((r) => unwrap<{ order_id: string; checkout_url: string }>(r.data)),
-  orders: () => api.get("/orders").then((r) => unwrap<Order[]>(r.data)),
+  orders: (params?: { beforeId?: number; includeExpired?: boolean }) =>
+    api
+      .get("/orders", {
+        params: {
+          ...(params?.beforeId !== undefined && { before_id: params.beforeId }),
+          ...(params?.includeExpired && { include_expired: "true" }),
+        },
+      })
+      .then((r) => unwrap<OrdersPage>(r.data)),
   order: (id: string) => api.get(`/orders/${id}`).then((r) => unwrap<Order>(r.data)),
   createRefund: (orderId: string, data: CreateRefundReq) =>
     api.post(`/orders/${orderId}/refunds`, data).then((r) => unwrap<Refund>(r.data)),

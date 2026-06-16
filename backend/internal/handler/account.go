@@ -90,6 +90,7 @@ func displayStatus(o repo.Order) string {
 
 func orderView(o repo.Order) map[string]any {
 	return map[string]any{
+		"row_id":          o.ID,
 		"order_id":        o.MerchantOrderID,
 		"upay_payment_id": o.UpayPaymentID,
 		"plan_code":       o.PlanCode,
@@ -176,7 +177,7 @@ func (h *Handler) CreateOrder(c echo.Context) error {
 	}, idemKey)
 	_ = h.repo.SaveUpayBodies(ctx, moid, reqBody, respBody)
 	if err != nil {
-		_ = h.repo.MarkOrderTerminal(ctx, "", "FAILED", "")
+		_ = h.repo.MarkOrderFailedByMOID(ctx, moid)
 		return fail(c, http.StatusBadGateway, "upstream_error", "create UPay order failed: "+err.Error())
 	}
 
@@ -203,7 +204,23 @@ func parseRFC3339(s string) *time.Time {
 
 func (h *Handler) ListOrders(c echo.Context) error {
 	uid := middleware.UserID(c)
-	orders, err := h.repo.ListOrders(c.Request().Context(), uid)
+	ctx := c.Request().Context()
+
+	var beforeID int64
+	if s := c.QueryParam("before_id"); s != "" {
+		if v, err := strconv.ParseInt(s, 10, 64); err == nil {
+			beforeID = v
+		}
+	}
+	includeExpired := c.QueryParam("include_expired") == "true"
+	limit := 20
+	if s := c.QueryParam("limit"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 && v <= 100 {
+			limit = v
+		}
+	}
+
+	orders, hasMore, err := h.repo.ListOrdersPage(ctx, uid, beforeID, includeExpired, limit)
 	if err != nil {
 		return fail(c, http.StatusInternalServerError, "internal", "query failed")
 	}
@@ -211,7 +228,10 @@ func (h *Handler) ListOrders(c echo.Context) error {
 	for _, o := range orders {
 		out = append(out, orderView(o))
 	}
-	return ok(c, out)
+	return ok(c, map[string]any{
+		"orders":   out,
+		"has_more": hasMore,
+	})
 }
 
 func (h *Handler) GetOrder(c echo.Context) error {

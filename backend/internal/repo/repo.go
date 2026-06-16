@@ -41,6 +41,7 @@ type Subscription struct {
 }
 
 type Order struct {
+	ID              int64 // internal row id; used as pagination cursor
 	MerchantOrderID string
 	UpayPaymentID   *string
 	PlanCode        string
@@ -198,6 +199,47 @@ func (r *Repo) ListOrders(ctx context.Context, userID int64) ([]Order, error) {
 	return out, rows.Err()
 }
 
+// ListOrdersPage returns up to limit orders for the user, ordered by id DESC.
+// beforeID=0 starts from the newest; pass the last row's ID to fetch the next page.
+// includeExpired=false hides EXPIRED orders and PENDING orders whose expires_at has passed.
+// has_more=true means there are more rows to fetch.
+func (r *Repo) ListOrdersPage(ctx context.Context, userID int64, beforeID int64, includeExpired bool, limit int) ([]Order, bool, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, merchant_order_id, upay_payment_id, plan_code, amount::text, currency,
+		        status, received_amount::text, failure_code, checkout_url,
+		        created_at, paid_at, expires_at
+		   FROM orders
+		  WHERE user_id=$1
+		    AND ($2 = 0 OR id < $2)
+		    AND ($3 OR (status <> 'EXPIRED'
+		             AND NOT (status = 'PENDING' AND expires_at IS NOT NULL AND expires_at < now())))
+		  ORDER BY id DESC
+		  LIMIT $4`,
+		userID, beforeID, includeExpired, limit+1)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	var out []Order
+	for rows.Next() {
+		var o Order
+		if err := rows.Scan(&o.ID, &o.MerchantOrderID, &o.UpayPaymentID, &o.PlanCode, &o.Amount, &o.Currency,
+			&o.Status, &o.ReceivedAmount, &o.FailureCode, &o.CheckoutURL,
+			&o.CreatedAt, &o.PaidAt, &o.ExpiresAt); err != nil {
+			return nil, false, err
+		}
+		out = append(out, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	hasMore := len(out) > limit
+	if hasMore {
+		out = out[:limit]
+	}
+	return out, hasMore, nil
+}
+
 func (r *Repo) GetOrder(ctx context.Context, userID int64, moid string) (Order, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT merchant_order_id, upay_payment_id, plan_code, amount::text, currency,
@@ -297,6 +339,16 @@ func (r *Repo) SaveRawWebhook(ctx context.Context, headers, rawBody []byte) (int
 	return id, err
 }
 
+// UpdateWebhookLog fills in event_type and resp_body on an existing raw log row.
+// Called after the handler decides what to respond, so both columns are nullable
+// until this update runs.
+func (r *Repo) UpdateWebhookLog(ctx context.Context, id int64, eventType, respBody string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE webhook_raw_log SET event_type=$2, resp_body=$3 WHERE id=$1`,
+		id, eventType, respBody)
+	return err
+}
+
 // InsertWebhookEvent records an event; returns inserted=false if the event id was
 // already seen (idempotent dedupe via UNIQUE(upay_event_id)).
 func (r *Repo) InsertWebhookEvent(ctx context.Context, eventID, payID, eventType string, payload []byte, rawLogID int64) (inserted bool, err error) {
@@ -339,6 +391,16 @@ func (r *Repo) MarkOrderTerminal(ctx context.Context, payID, status, reason stri
 		`UPDATE orders SET status=$2, failure_code=$3
 		   WHERE upay_payment_id=$1 AND status='PENDING'`,
 		payID, status, fc)
+	return err
+}
+
+// MarkOrderFailedByMOID marks a PENDING order as FAILED using the local merchant_order_id.
+// Used when UPay order creation fails before a upay_payment_id is assigned.
+func (r *Repo) MarkOrderFailedByMOID(ctx context.Context, moid string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE orders SET status='FAILED'
+		   WHERE merchant_order_id=$1 AND status='PENDING'`,
+		moid)
 	return err
 }
 

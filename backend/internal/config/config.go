@@ -20,6 +20,9 @@ type Config struct {
 	UpayWebhookKeys   string // comma-separated to support key rotation
 	UpayCACertPath    string
 	ReconcileInterval time.Duration
+
+	// Yoki merchant webhook secret (comma-separated for rotation).
+	YokiWebhookKeys string
 }
 
 // UpayEnabled reports whether real UPay integration is configured.
@@ -27,10 +30,19 @@ func (c Config) UpayEnabled() bool {
 	return c.UpayAPIKey != "" && c.UpayBaseURL != ""
 }
 
-// WebhookSecrets returns the configured signing secrets (new first for rotation).
+// WebhookSecrets returns the UPay signing secrets (new first for rotation).
 func (c Config) WebhookSecrets() []string {
+	return splitSecrets(c.UpayWebhookKeys)
+}
+
+// YokiWebhookSecrets returns the Yoki signing secrets (new first for rotation).
+func (c Config) YokiWebhookSecrets() []string {
+	return splitSecrets(c.YokiWebhookKeys)
+}
+
+func splitSecrets(raw string) []string {
 	var out []string
-	for _, s := range strings.Split(c.UpayWebhookKeys, ",") {
+	for _, s := range strings.Split(raw, ",") {
 		if s = strings.TrimSpace(s); s != "" {
 			out = append(out, s)
 		}
@@ -57,6 +69,7 @@ func Load() Config {
 		UpayWebhookKeys:   env("UPAY_WEBHOOK_SECRET", ""),
 		UpayCACertPath:    env("UPAY_CA_CERT", ""),
 		ReconcileInterval: reconcile,
+		YokiWebhookKeys:   env("YOKI_WEBHOOK_SECRET", ""),
 	}
 }
 

@@ -11,6 +11,42 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// YokiWebhook receives UPay events forwarded for the Yoki merchant. It always
+// writes a webhook_raw_log row regardless of signature or parse outcome.
+func (h *Handler) YokiWebhook(c echo.Context) error {
+	raw, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.NoContent(http.StatusBadRequest)
+	}
+
+	ctx := c.Request().Context()
+
+	hdrJSON, _ := json.Marshal(c.Request().Header)
+	logID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, raw)
+	if err != nil {
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	// finalize closes the log row with outcome info before returning a response.
+	finalize := func(status int, eventType, respBody string) error {
+		_ = h.repo.UpdateWebhookLog(ctx, logID, eventType, respBody)
+		return c.NoContent(status)
+	}
+
+	if err := upay.VerifyWebhook(
+		c.Request().Header.Get("UPay-Signature"), raw, h.cfg.YokiWebhookSecrets(), time.Now(),
+	); err != nil {
+		return finalize(http.StatusBadRequest, "", "sig_failed")
+	}
+
+	evt, err := upay.ParseEvent(raw)
+	if err != nil || evt.ID == "" {
+		return finalize(http.StatusBadRequest, "", "parse_error")
+	}
+
+	return finalize(http.StatusOK, evt.Event, "ok")
+}
+
 // UpayWebhook receives UPay events. Order: read raw body -> save raw log ->
 // verify signature -> dedupe by event.id -> on paid, re-fetch authoritative
 // state and activate. Always returns 2xx quickly on success.

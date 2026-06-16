@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { apiClient, type CreateRefundReq } from "../api/client";
 
@@ -156,14 +156,45 @@ function RefundDialog({ orderId, amount, currency, onClose }: RefundDialogProps)
 // ---- Orders page ----
 
 export default function Orders() {
-  const { data: orders, isLoading } = useQuery({ queryKey: ["orders"], queryFn: apiClient.orders });
+  const [showExpired, setShowExpired] = useState(false);
   const [refundFor, setRefundFor] = useState<{ id: string; amount: string; currency: string } | null>(null);
+
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["orders", showExpired],
+    queryFn: ({ pageParam }: { pageParam: number | undefined }) =>
+      apiClient.orders({ beforeId: pageParam, includeExpired: showExpired }),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.has_more) return undefined;
+      const last = lastPage.orders[lastPage.orders.length - 1];
+      return last?.row_id;
+    },
+  });
+
+  const orders = data?.pages.flatMap((p) => p.orders) ?? [];
 
   if (isLoading) return <p>加载中…</p>;
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4">支付订单</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold">支付订单</h1>
+        <label className="flex items-center gap-2 text-sm text-slate-500 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showExpired}
+            onChange={(e) => setShowExpired(e.target.checked)}
+            className="accent-indigo-600"
+          />
+          显示超时订单
+        </label>
+      </div>
 
       {refundFor && (
         <RefundDialog
@@ -187,7 +218,7 @@ export default function Orders() {
             </tr>
           </thead>
           <tbody>
-            {orders?.map((o) => (
+            {orders.map((o) => (
               <tr key={o.order_id} className="border-t">
                 <td className="px-4 py-2"><OrderId id={o.order_id} /></td>
                 <td className="px-4 py-2">{o.plan_code}</td>
@@ -221,7 +252,7 @@ export default function Orders() {
                 </td>
               </tr>
             ))}
-            {!orders?.length && (
+            {orders.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
                   暂无订单
@@ -230,6 +261,18 @@ export default function Orders() {
             )}
           </tbody>
         </table>
+
+        {hasNextPage && (
+          <div className="flex justify-center py-3 border-t">
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="text-sm text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+            >
+              {isFetchingNextPage ? "加载中…" : "加载更多"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
