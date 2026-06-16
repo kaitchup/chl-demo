@@ -172,7 +172,6 @@ func (h *Handler) CreateOrder(c echo.Context) error {
 		Description:      plan.Name,
 		ExpiresInSeconds: 1800,
 		SuccessURL:       resultURL,
-		CancelURL:        resultURL,
 		Metadata:         map[string]string{"user_id": fmt.Sprint(uid), "plan_code": plan.Code},
 	}, idemKey)
 	_ = h.repo.SaveUpayBodies(ctx, moid, reqBody, respBody)

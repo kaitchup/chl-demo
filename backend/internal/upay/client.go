@@ -61,7 +61,6 @@ type CreateOrderReq struct {
 	Description      string            `json:"description,omitempty"`
 	ExpiresInSeconds int               `json:"expires_in_seconds,omitempty"` // 1800..3600
 	SuccessURL       string            `json:"success_url,omitempty"`
-	CancelURL        string            `json:"cancel_url,omitempty"`
 	Metadata         map[string]string `json:"metadata,omitempty"`
 }
 
