@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -23,6 +24,19 @@ type Config struct {
 
 	// Yoki merchant webhook secret (comma-separated for rotation).
 	YokiWebhookKeys string
+
+	// Sandbox / simulate-settlement module (Dolos admin account).
+	// When DolosEmail is empty the sandbox endpoints return 503.
+	DolosEmail           string
+	DolosPassword        string
+	AdminBaseURL         string
+	MerchantAdminBaseURL string
+	SandboxMaxAMLRetries int
+}
+
+// SandboxEnabled reports whether the sandbox simulate module is configured.
+func (c Config) SandboxEnabled() bool {
+	return c.DolosEmail != "" && c.AdminBaseURL != ""
 }
 
 // UpayEnabled reports whether real UPay integration is configured.
@@ -69,13 +83,27 @@ func Load() Config {
 		UpayWebhookKeys:   env("UPAY_WEBHOOK_SECRET", ""),
 		UpayCACertPath:    env("UPAY_CA_CERT", ""),
 		ReconcileInterval: reconcile,
-		YokiWebhookKeys:   env("YOKI_WEBHOOK_SECRET", ""),
+		YokiWebhookKeys:      env("YOKI_WEBHOOK_SECRET", ""),
+		DolosEmail:           env("DOLOS_EMAIL", ""),
+		DolosPassword:        env("DOLOS_PASSWORD", ""),
+		AdminBaseURL:         env("ADMIN_BASE_URL", ""),
+		MerchantAdminBaseURL: env("MERCHANT_ADMIN_BASE_URL", ""),
+		SandboxMaxAMLRetries: envInt("SANDBOX_MAX_AML_RETRIES", 20),
 	}
 }
 
 func env(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
+	}
+	return def
+}
+
+func envInt(k string, def int) int {
+	if v := os.Getenv(k); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return def
 }

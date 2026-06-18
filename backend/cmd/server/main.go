@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"chldemo/db"
+	"chldemo/internal/admin"
 	"chldemo/internal/config"
 	"chldemo/internal/handler"
 	"chldemo/internal/job"
@@ -60,6 +62,19 @@ func main() {
 
 	h := handler.New(cfg, r, upayClient, payment)
 
+	// Sandbox module: optional, requires Dolos credentials.
+	var sandboxHandler *handler.SandboxHandler
+	if cfg.SandboxEnabled() {
+		adminClient := admin.NewClient(cfg.AdminBaseURL, cfg.DolosEmail, cfg.DolosPassword)
+		merchantAuth := admin.NewMerchantAuth(cfg.MerchantAdminBaseURL)
+		sandboxHandler = handler.NewSandboxHandler(r, adminClient, merchantAuth, cfg.SandboxMaxAMLRetries)
+		amlPoller := job.NewAMLPoller(r, adminClient, cfg.ReconcileInterval)
+		go amlPoller.Run(ctx)
+		log.Printf("sandbox enabled (admin=%s merchant-admin=%s)", cfg.AdminBaseURL, cfg.MerchantAdminBaseURL)
+	} else {
+		log.Println("sandbox NOT configured — DOLOS_EMAIL/ADMIN_BASE_URL not set")
+	}
+
 	e := echo.New()
 	e.HideBanner = true
 	e.Use(emw.Logger(), emw.Recover())
@@ -86,6 +101,21 @@ func main() {
 	auth.GET("/orders/:id/refunds", h.ListOrderRefunds)
 	auth.GET("/refunds/:id", h.GetRefund)
 	auth.POST("/refunds/:id/sync", h.SyncRefund)
+
+	// Sandbox routes: authenticated via X-Merchant-Token (merchant-admin JWT).
+	// Returns 503 when sandbox is not configured.
+	sb := api.Group("/sandbox")
+	if sandboxHandler != nil {
+		sb.POST("/simulations", sandboxHandler.CreateSimulation)
+		sb.GET("/simulations", sandboxHandler.ListSimulations)
+		sb.GET("/simulations/:id", sandboxHandler.GetSimulation)
+	} else {
+		sb.Any("/*", func(c echo.Context) error {
+			return c.JSON(http.StatusServiceUnavailable, map[string]any{
+				"error": map[string]any{"code": "sandbox_disabled", "message": "sandbox not configured"},
+			})
+		})
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
