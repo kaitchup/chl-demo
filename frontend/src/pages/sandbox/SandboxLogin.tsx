@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import sandboxApi from "../../api/sandboxClient";
 import { useSandboxAuth } from "../../auth/SandboxAuthContext";
-
-const MERCHANT_ADMIN_PROFILE =
-  (import.meta.env.VITE_MERCHANT_ADMIN_BASE || "https://merchant.upay-test.com/api/v1") +
-  "/auth/profile";
 
 export default function SandboxLogin() {
   const { setAuth } = useSandboxAuth();
@@ -22,15 +18,13 @@ export default function SandboxLogin() {
 
     setLoading(true);
     try {
-      const resp = await axios.get(MERCHANT_ADMIN_PROFILE, {
-        headers: { Authorization: `Bearer ${t}` },
-      });
-      const user = resp.data?.user;
-      if (!user?.merchant_id) {
+      const resp = await sandboxApi.post("/sandbox/verify-token", { token: t });
+      const data = resp.data?.data;
+      if (!data?.merchant_id) {
         setError("响应中没有 merchant_id，请检查 token 是否来自正确的商户后台");
         return;
       }
-      setAuth(t, user.merchant_id, user.merchant_name ?? user.merchant_id);
+      setAuth(t, data.merchant_id, data.merchant_name ?? data.merchant_id);
       nav("/sandbox/simulations");
     } catch (err: any) {
       if (err.response?.status === 401) {

@@ -221,19 +221,20 @@ type depositListReq struct {
 	Offset    string `json:"offset"`
 }
 
+// Deposit matches the DepositItem shape returned by POST /platform/deposits/list.
 type Deposit struct {
 	ID           string `json:"id"`
 	ToAddress    string `json:"to_address"`
 	Amount       string `json:"amount"`
-	Coin         string `json:"coin"`
+	CoinSymbol   string `json:"coin_symbol"`
 	InspectionID string `json:"inspection_id"`
 	Status       string `json:"status"`
-	CreatedAt    string `json:"created_at"`
+	CreatedAt    string `json:"create_at"`
 }
 
 type depositListResp struct {
-	Data  []Deposit `json:"data"`
-	Total int       `json:"total"`
+	Items   []Deposit `json:"items"`
+	HasMore string    `json:"has_more"`
 }
 
 func (c *Client) ListDeposits(toAddress string) ([]Deposit, error) {
@@ -252,20 +253,22 @@ func (c *Client) ListDeposits(toAddress string) ([]Deposit, error) {
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("decode deposits: %w", err)
 	}
-	return resp.Data, nil
+	return resp.Items, nil
 }
 
 // --- AML tickets ---
 
+// AMLTicket matches the ReviewTicket shape from GET /platform/compliance/aml/review-tickets.
+// TicketNo is the identifier used in the submit-review path parameter.
 type AMLTicket struct {
-	ID           string `json:"id"`
+	TicketNo     string `json:"ticket_no"`
 	InspectionID string `json:"inspection_id"`
 	Status       string `json:"status"`
 }
 
 type amlTicketListResp struct {
-	Data  []AMLTicket `json:"data"`
-	Total int         `json:"total"`
+	Tickets []AMLTicket `json:"tickets"`
+	Total   int         `json:"total"`
 }
 
 func (c *Client) GetAMLTicketByInspectionID(inspectionID string) (*AMLTicket, error) {
@@ -281,15 +284,17 @@ func (c *Client) GetAMLTicketByInspectionID(inspectionID string) (*AMLTicket, er
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("decode aml tickets: %w", err)
 	}
-	if len(resp.Data) == 0 {
+	if len(resp.Tickets) == 0 {
 		return nil, nil
 	}
-	return &resp.Data[0], nil
+	return &resp.Tickets[0], nil
 }
 
-func (c *Client) SubmitAMLReview(ticketUUID string) error {
+// SubmitAMLReview approves the AML review ticket identified by its ticket_no.
+func (c *Client) SubmitAMLReview(ticketNo string) error {
 	code, raw, err := c.do(http.MethodPost,
-		"/platform/compliance/aml/review-tickets/"+ticketUUID+"/submit-review", map[string]any{})
+		"/platform/compliance/aml/review-tickets/"+ticketNo+"/submit-review",
+		map[string]any{"status": "APPROVED"})
 	if err != nil {
 		return err
 	}
@@ -301,19 +306,20 @@ func (c *Client) SubmitAMLReview(ticketUUID string) error {
 
 // --- Webhook delivery records ---
 
+// WebhookDelivery matches the WebhookDeliveryRow shape from
+// GET /platform/payment-requests/:id/webhooks.
 type WebhookDelivery struct {
-	ID          string `json:"id"`
-	EventType   string `json:"event_type"`
-	URL         string `json:"url"`
-	Status      string `json:"status"`
-	HTTPStatus  int    `json:"http_status"`
-	Attempts    int    `json:"attempts"`
-	DeliveredAt string `json:"delivered_at"`
-	CreatedAt   string `json:"created_at"`
+	ID             string `json:"id"`
+	EventType      string `json:"event_type"`
+	Status         string `json:"status"`
+	LastStatusCode int    `json:"last_status_code"`
+	Attempts       int    `json:"attempts"`
+	DeliveredAt    any    `json:"delivered_at_unix_micro"`
+	CreatedAt      any    `json:"created_at_unix_micro"`
 }
 
 type webhookListResp struct {
-	Data  []WebhookDelivery `json:"data"`
+	Items []WebhookDelivery `json:"items"`
 	Total int               `json:"total"`
 }
 
@@ -331,5 +337,5 @@ func (c *Client) ListWebhookDeliveries(paymentRequestID string, page, size int) 
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, 0, fmt.Errorf("decode webhooks: %w", err)
 	}
-	return resp.Data, resp.Total, nil
+	return resp.Items, resp.Total, nil
 }

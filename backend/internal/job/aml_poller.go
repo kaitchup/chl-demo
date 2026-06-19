@@ -102,11 +102,11 @@ func (p *AMLPoller) process(ctx context.Context, s repo.Simulation) {
 			if amlTicket == nil {
 				continue // not yet available
 			}
-			if err := p.repo.SetAMLTicketUUID(ctx, t.InspectionID, amlTicket.ID); err != nil {
+			if err := p.repo.SetAMLTicketUUID(ctx, t.InspectionID, amlTicket.TicketNo); err != nil {
 				log.Printf("aml poller: set uuid sim %d: %v", s.ID, err)
 				continue
 			}
-			t.TicketUUID = &amlTicket.ID
+			t.TicketUUID = &amlTicket.TicketNo
 		}
 
 		// Step 3: submit review for unapproved tickets.

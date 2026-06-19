@@ -106,6 +106,7 @@ func main() {
 	// Returns 503 when sandbox is not configured.
 	sb := api.Group("/sandbox")
 	if sandboxHandler != nil {
+		sb.POST("/verify-token", sandboxHandler.VerifyToken)
 		sb.POST("/simulations", sandboxHandler.CreateSimulation)
 		sb.GET("/simulations", sandboxHandler.ListSimulations)
 		sb.GET("/simulations/:id", sandboxHandler.GetSimulation)

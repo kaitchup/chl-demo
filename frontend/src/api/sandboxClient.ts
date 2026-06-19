@@ -42,12 +42,11 @@ export interface AMLTicket {
 export interface WebhookDelivery {
   id: string;
   event_type: string;
-  url: string;
   status: string;
-  http_status: number;
+  last_status_code: number;
   attempts: number;
-  delivered_at: string | null;
-  created_at: string;
+  delivered_at_unix_micro: number | string | null;
+  created_at_unix_micro: number | string;
 }
 
 export interface Simulation {

@@ -24,6 +24,24 @@ func NewSandboxHandler(r *repo.Repo, ac *admin.Client, ma *admin.MerchantAuth, m
 	return &SandboxHandler{repo: r, adminClient: ac, merchantAuth: ma, maxRetries: maxRetries}
 }
 
+// POST /api/sandbox/verify-token — 代浏览器校验 merchant-admin JWT，避免前端直连 MERCHANT_ADMIN_BASE_URL。
+func (sh *SandboxHandler) VerifyToken(c echo.Context) error {
+	var in struct {
+		Token string `json:"token"`
+	}
+	if err := c.Bind(&in); err != nil || in.Token == "" {
+		return fail(c, http.StatusBadRequest, "invalid_request", "token required")
+	}
+	profile, err := sh.merchantAuth.VerifyToken(in.Token)
+	if err != nil {
+		return fail(c, http.StatusUnauthorized, "invalid_token", err.Error())
+	}
+	return ok(c, map[string]any{
+		"merchant_id":   profile.MerchantID,
+		"merchant_name": profile.MerchantName,
+	})
+}
+
 // merchantToken extracts and verifies the X-Merchant-Token header.
 // Returns the merchant profile or writes a 401 and returns nil.
 func (sh *SandboxHandler) merchantToken(c echo.Context) *admin.MerchantProfile {

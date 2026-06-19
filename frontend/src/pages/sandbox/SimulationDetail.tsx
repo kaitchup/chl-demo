@@ -167,11 +167,11 @@ export default function SimulationDetail() {
                         {w.status}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-slate-500">{w.http_status || "—"}</td>
+                    <td className="px-4 py-2 text-slate-500">{w.last_status_code || "—"}</td>
                     <td className="px-4 py-2 text-slate-500">{w.attempts}</td>
                     <td className="px-4 py-2 text-slate-500">
-                      {w.delivered_at
-                        ? new Date(w.delivered_at).toLocaleString("zh-CN")
+                      {w.delivered_at_unix_micro
+                        ? new Date(Number(w.delivered_at_unix_micro) / 1000).toLocaleString("zh-CN")
                         : "—"}
                     </td>
                   </tr>
