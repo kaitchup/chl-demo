@@ -288,17 +288,17 @@ func (r *Repo) AttachUpayResult(ctx context.Context, moid, payID, checkoutURL st
 	return err
 }
 
-// ReuseOpenOrder returns the user's most recent reusable PENDING order (not expired),
-// or ErrNotFound. Used to avoid creating duplicate UPay orders.
-func (r *Repo) ReuseOpenOrder(ctx context.Context, userID int64) (Order, error) {
+// ReuseOpenOrder returns the user's most recent reusable PENDING order for the
+// given plan (not expired), or ErrNotFound. Used to avoid duplicate UPay orders.
+func (r *Repo) ReuseOpenOrder(ctx context.Context, userID int64, planCode string) (Order, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT merchant_order_id, upay_payment_id, plan_code, amount::text, currency,
 		        status, received_amount::text, failure_code, checkout_url,
 		        created_at, paid_at, expires_at
 		   FROM orders
-		  WHERE user_id=$1 AND status='PENDING' AND upay_payment_id IS NOT NULL
+		  WHERE user_id=$1 AND plan_code=$2 AND status='PENDING' AND upay_payment_id IS NOT NULL
 		        AND expires_at > now()
-		  ORDER BY created_at DESC LIMIT 1`, userID)
+		  ORDER BY created_at DESC LIMIT 1`, userID, planCode)
 	o, err := scanOrder(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return o, ErrNotFound

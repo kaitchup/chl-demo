@@ -24,35 +24,37 @@ func NewSandboxHandler(r *repo.Repo, ac *admin.Client, ma *admin.MerchantAuth, m
 	return &SandboxHandler{repo: r, adminClient: ac, merchantAuth: ma, maxRetries: maxRetries}
 }
 
-// POST /api/sandbox/verify-token — 代浏览器校验 merchant-admin JWT，避免前端直连 MERCHANT_ADMIN_BASE_URL。
-func (sh *SandboxHandler) VerifyToken(c echo.Context) error {
+// POST /api/sandbox/login
+func (sh *SandboxHandler) Login(c echo.Context) error {
 	var in struct {
-		Token string `json:"token"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
-	if err := c.Bind(&in); err != nil || in.Token == "" {
-		return fail(c, http.StatusBadRequest, "invalid_request", "token required")
+	if err := c.Bind(&in); err != nil || in.Email == "" || in.Password == "" {
+		return fail(c, http.StatusBadRequest, "invalid_request", "email and password required")
 	}
-	profile, err := sh.merchantAuth.VerifyToken(in.Token)
+	sessionKey, profile, err := sh.merchantAuth.Login(in.Email, in.Password)
 	if err != nil {
-		return fail(c, http.StatusUnauthorized, "invalid_token", err.Error())
+		return fail(c, http.StatusUnauthorized, "login_failed", err.Error())
 	}
 	return ok(c, map[string]any{
+		"session_key":   sessionKey,
 		"merchant_id":   profile.MerchantID,
 		"merchant_name": profile.MerchantName,
 	})
 }
 
-// merchantToken extracts and verifies the X-Merchant-Token header.
+// merchantProfile extracts and resolves the X-Merchant-Token session key.
 // Returns the merchant profile or writes a 401 and returns nil.
-func (sh *SandboxHandler) merchantToken(c echo.Context) *admin.MerchantProfile {
-	tok := c.Request().Header.Get("X-Merchant-Token")
-	if tok == "" {
+func (sh *SandboxHandler) merchantProfile(c echo.Context) *admin.MerchantProfile {
+	key := c.Request().Header.Get("X-Merchant-Token")
+	if key == "" {
 		_ = fail(c, http.StatusUnauthorized, "missing_token", "X-Merchant-Token header required")
 		return nil
 	}
-	profile, err := sh.merchantAuth.VerifyToken(tok)
-	if err != nil {
-		_ = fail(c, http.StatusUnauthorized, "invalid_token", err.Error())
+	profile, ok := sh.merchantAuth.GetProfile(key)
+	if !ok {
+		_ = fail(c, http.StatusUnauthorized, "invalid_session", "session not found, please log in again")
 		return nil
 	}
 	return profile
@@ -60,7 +62,7 @@ func (sh *SandboxHandler) merchantToken(c echo.Context) *admin.MerchantProfile {
 
 // POST /api/sandbox/simulations
 func (sh *SandboxHandler) CreateSimulation(c echo.Context) error {
-	profile := sh.merchantToken(c)
+	profile := sh.merchantProfile(c)
 	if profile == nil {
 		return nil
 	}
@@ -116,6 +118,17 @@ func (sh *SandboxHandler) CreateSimulation(c echo.Context) error {
 		return fail(c, http.StatusInternalServerError, "internal", "create simulation failed")
 	}
 
+	// Verify the payment request belongs to the logged-in merchant.
+	ownerID, err := sh.adminClient.GetPaymentRequestMerchantID(in.PaymentRequestID)
+	if err != nil {
+		_ = sh.repo.MarkSimulationFailed(ctx, simID, err.Error())
+		return fail(c, http.StatusBadRequest, "invalid_payment_request", err.Error())
+	}
+	if ownerID != profile.MerchantID {
+		_ = sh.repo.MarkSimulationFailed(ctx, simID, "payment request belongs to another merchant")
+		return fail(c, http.StatusForbidden, "forbidden", "payment request does not belong to your merchant account")
+	}
+
 	// Call admin API to trigger the simulation.
 	_, err = sh.adminClient.SimulateSettlement(in.PaymentRequestID, admin.SimulateReq{
 		Scenario: in.Scenario,
@@ -132,7 +145,7 @@ func (sh *SandboxHandler) CreateSimulation(c echo.Context) error {
 
 // GET /api/sandbox/simulations
 func (sh *SandboxHandler) ListSimulations(c echo.Context) error {
-	profile := sh.merchantToken(c)
+	profile := sh.merchantProfile(c)
 	if profile == nil {
 		return nil
 	}
@@ -164,7 +177,7 @@ func (sh *SandboxHandler) ListSimulations(c echo.Context) error {
 
 // GET /api/sandbox/simulations/:id
 func (sh *SandboxHandler) GetSimulation(c echo.Context) error {
-	profile := sh.merchantToken(c)
+	profile := sh.merchantProfile(c)
 	if profile == nil {
 		return nil
 	}

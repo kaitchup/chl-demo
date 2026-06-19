@@ -180,6 +180,35 @@ func (c *Client) do(method, path string, body any) (int, []byte, error) {
 	return resp.StatusCode, raw, nil
 }
 
+// --- Payment requests ---
+
+type paymentRequestListResp struct {
+	Items []struct {
+		MerchantID string `json:"merchant_id"`
+	} `json:"items"`
+}
+
+// GetPaymentRequestMerchantID returns the merchant_id for the given payment
+// request ID, or an error if the request is not found.
+func (c *Client) GetPaymentRequestMerchantID(paymentRequestID string) (string, error) {
+	code, raw, err := c.do(http.MethodGet,
+		"/platform/payment-requests?id="+paymentRequestID+"&limit=1", nil)
+	if err != nil {
+		return "", err
+	}
+	if code/100 != 2 {
+		return "", fmt.Errorf("get payment request %d: %s", code, raw)
+	}
+	var resp paymentRequestListResp
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return "", fmt.Errorf("decode payment request: %w", err)
+	}
+	if len(resp.Items) == 0 {
+		return "", fmt.Errorf("payment request not found: %s", paymentRequestID)
+	}
+	return resp.Items[0].MerchantID, nil
+}
+
 // --- Simulate settlement ---
 
 type SimEvent struct {

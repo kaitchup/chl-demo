@@ -6,31 +6,34 @@ import { useSandboxAuth } from "../../auth/SandboxAuthContext";
 export default function SandboxLogin() {
   const { setAuth } = useSandboxAuth();
   const nav = useNavigate();
-  const [token, setToken] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    const t = token.trim();
-    if (!t) return;
+    if (!email.trim() || !password) return;
 
     setLoading(true);
     try {
-      const resp = await sandboxApi.post("/sandbox/verify-token", { token: t });
+      const resp = await sandboxApi.post("/sandbox/login", {
+        email: email.trim(),
+        password,
+      });
       const data = resp.data?.data;
-      if (!data?.merchant_id) {
-        setError("响应中没有 merchant_id，请检查 token 是否来自正确的商户后台");
+      if (!data?.session_key || !data?.merchant_id) {
+        setError("登录响应异常，请重试");
         return;
       }
-      setAuth(t, data.merchant_id, data.merchant_name ?? data.merchant_id);
+      setAuth(data.session_key, data.merchant_id, data.merchant_name ?? data.merchant_id);
       nav("/sandbox/simulations");
     } catch (err: any) {
       if (err.response?.status === 401) {
-        setError("Token 无效或已过期，请重新从商户后台复制");
+        setError("邮箱或密码错误");
       } else {
-        setError("验证失败：" + (err.message ?? "未知错误"));
+        setError("登录失败：" + (err.message ?? "未知错误"));
       }
     } finally {
       setLoading(false);
@@ -42,19 +45,31 @@ export default function SandboxLogin() {
       <div className="w-full max-w-md bg-white rounded-xl border p-8 shadow-sm">
         <h1 className="text-xl font-semibold mb-1">沙盒测试台</h1>
         <p className="text-sm text-slate-500 mb-6">
-          从商户后台（merchant-admin）的开发者工具中复制访问 Token，粘贴到下方。
+          使用商户后台（merchant-admin）账号登录。
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Merchant-Admin Token
-            </label>
-            <textarea
-              className="w-full border rounded-lg px-3 py-2 text-xs font-mono resize-none h-28 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
+            <label className="block text-sm font-medium text-slate-700 mb-1">邮箱</label>
+            <input
+              type="email"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="merchant@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">密码</label>
+            <input
+              type="password"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
             />
           </div>
 
@@ -66,17 +81,13 @@ export default function SandboxLogin() {
 
           <button
             type="submit"
-            disabled={loading || !token.trim()}
+            disabled={loading || !email.trim() || !password}
             className="w-full bg-indigo-600 text-white rounded-lg py-2.5 text-sm font-medium
                        hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "验证中…" : "进入沙盒"}
+            {loading ? "登录中…" : "进入沙盒"}
           </button>
         </form>
-
-        <p className="text-xs text-slate-400 mt-4">
-          Token 仅存储在当前浏览器 session，关闭标签页后自动清除。
-        </p>
       </div>
     </div>
   );

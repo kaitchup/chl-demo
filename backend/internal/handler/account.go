@@ -129,7 +129,7 @@ func (h *Handler) CreateOrder(c echo.Context) error {
 
 	// Reuse an existing open UPay order to avoid duplicate checkouts (real mode only).
 	if h.upay != nil {
-		if ord, err := h.repo.ReuseOpenOrder(ctx, uid); err == nil && ord.CheckoutURL != nil {
+		if ord, err := h.repo.ReuseOpenOrder(ctx, uid, plan.Code); err == nil && ord.CheckoutURL != nil {
 			return ok(c, map[string]any{
 				"order_id": ord.MerchantOrderID, "checkout_url": *ord.CheckoutURL,
 				"expires_at": ord.ExpiresAt, "reused": true,

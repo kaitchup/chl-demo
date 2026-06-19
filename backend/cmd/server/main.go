@@ -102,11 +102,11 @@ func main() {
 	auth.GET("/refunds/:id", h.GetRefund)
 	auth.POST("/refunds/:id/sync", h.SyncRefund)
 
-	// Sandbox routes: authenticated via X-Merchant-Token (merchant-admin JWT).
+	// Sandbox routes — /login is public; simulation routes require X-Merchant-Token session key.
 	// Returns 503 when sandbox is not configured.
 	sb := api.Group("/sandbox")
 	if sandboxHandler != nil {
-		sb.POST("/verify-token", sandboxHandler.VerifyToken)
+		sb.POST("/login", sandboxHandler.Login)
 		sb.POST("/simulations", sandboxHandler.CreateSimulation)
 		sb.GET("/simulations", sandboxHandler.ListSimulations)
 		sb.GET("/simulations/:id", sandboxHandler.GetSimulation)
