@@ -102,7 +102,7 @@ func (r *Repo) ListSimulations(ctx context.Context, merchantID string, limit, of
 	return out, rows.Err()
 }
 
-// ListPendingSimulations returns all RISK simulations in SIMULATING or AML_PENDING state
+// ListPendingSimulations returns all simulations in SIMULATING or AML_PENDING state
 // that have not yet exceeded max_retries.
 func (r *Repo) ListPendingSimulations(ctx context.Context) ([]Simulation, error) {
 	rows, err := r.pool.Query(ctx, `
@@ -110,8 +110,7 @@ func (r *Repo) ListPendingSimulations(ctx context.Context) ([]Simulation, error)
 		       amount, coin, sim_events, status, retry_count, max_retries,
 		       error_detail, created_at, updated_at
 		  FROM sandbox_simulations
-		 WHERE scenario = 'RISK'
-		   AND status IN ('SIMULATING','AML_PENDING')
+		 WHERE status IN ('SIMULATING','AML_PENDING')
 		   AND retry_count < max_retries
 		 ORDER BY created_at`)
 	if err != nil {

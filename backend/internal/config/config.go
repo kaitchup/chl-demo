@@ -88,7 +88,7 @@ func Load() Config {
 		DolosPassword:        env("DOLOS_PASSWORD", ""),
 		AdminBaseURL:         env("ADMIN_BASE_URL", ""),
 		MerchantAdminBaseURL: env("MERCHANT_ADMIN_BASE_URL", ""),
-		SandboxMaxAMLRetries: envInt("SANDBOX_MAX_AML_RETRIES", 20),
+		SandboxMaxAMLRetries: envInt("SANDBOX_MAX_AML_RETRIES", 3),
 	}
 }
 

@@ -82,8 +82,8 @@ func (sh *SandboxHandler) CreateSimulation(c echo.Context) error {
 	if in.Scenario == "" {
 		return fail(c, http.StatusBadRequest, "invalid_request", "scenario required")
 	}
-	if in.Scenario == "RISK" && in.ToAddress == "" {
-		return fail(c, http.StatusBadRequest, "invalid_request", "to_address required for RISK scenario")
+	if in.ToAddress == "" {
+		return fail(c, http.StatusBadRequest, "invalid_request", "to_address required")
 	}
 	if len(in.Events) == 0 {
 		return fail(c, http.StatusBadRequest, "invalid_request", "events required")
@@ -124,11 +124,6 @@ func (sh *SandboxHandler) CreateSimulation(c echo.Context) error {
 	if err != nil {
 		_ = sh.repo.MarkSimulationFailed(ctx, simID, err.Error())
 		return fail(c, http.StatusBadGateway, "simulate_failed", err.Error())
-	}
-
-	// Non-RISK scenarios complete immediately (no AML loop needed).
-	if in.Scenario != "RISK" {
-		_ = sh.repo.MarkSimulationDone(ctx, simID)
 	}
 
 	sim, _ := sh.repo.GetSimulation(ctx, simID, profile.MerchantID)

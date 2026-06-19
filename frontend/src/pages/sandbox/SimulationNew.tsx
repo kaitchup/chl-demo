@@ -60,8 +60,8 @@ export default function SimulationNew() {
       setError("payment_request_id 必填");
       return;
     }
-    if (scenario === "RISK" && !toAddress.trim()) {
-      setError("RISK 场景需要填写充值地址 (to_address)");
+    if (!toAddress.trim()) {
+      setError("充值地址 (to_address) 必填");
       return;
     }
 
@@ -76,7 +76,7 @@ export default function SimulationNew() {
       scenario,
       amount,
       coin: coin || undefined,
-      to_address: scenario === "RISK" ? toAddress.trim() : undefined,
+      to_address: toAddress.trim(),
       events,
     };
 
@@ -183,20 +183,18 @@ export default function SimulationNew() {
           </Field>
         )}
 
-        {/* RISK to_address */}
-        {scenario === "RISK" && (
-          <Field label="充值地址 (to_address)">
-            <input
-              className="input font-mono text-xs"
-              placeholder="0x..."
-              value={toAddress}
-              onChange={(e) => setToAddress(e.target.value)}
-            />
-            <p className="text-xs text-slate-400 mt-1">
-              收银台页面中展示给付款方的 USDT 转入地址，用于匹配 AML 工单
-            </p>
-          </Field>
-        )}
+        {/* to_address — required for all scenarios (AML poller needs it) */}
+        <Field label="充值地址 (to_address)">
+          <input
+            className="input font-mono text-xs"
+            placeholder="0x..."
+            value={toAddress}
+            onChange={(e) => setToAddress(e.target.value)}
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            收银台页面中展示给付款方的 USDT 转入地址，用于匹配 AML 工单
+          </p>
+        </Field>
 
         {/* preview */}
         <div className="rounded-lg bg-slate-50 border p-3 text-xs space-y-1">

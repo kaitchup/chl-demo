@@ -294,7 +294,11 @@ func (c *Client) GetAMLTicketByInspectionID(inspectionID string) (*AMLTicket, er
 func (c *Client) SubmitAMLReview(ticketNo string) error {
 	code, raw, err := c.do(http.MethodPost,
 		"/platform/compliance/aml/review-tickets/"+ticketNo+"/submit-review",
-		map[string]any{"status": "APPROVED"})
+		map[string]any{
+			"status":           "approved",
+			"final_risk_level": "low",
+			"comment":          "auto-approved by sandbox simulation (" + c.email + ")",
+		})
 	if err != nil {
 		return err
 	}
