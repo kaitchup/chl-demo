@@ -23,8 +23,9 @@ type Config struct {
 	ReconcileInterval time.Duration
 
 	// Per-merchant webhook secrets (comma-separated for rotation).
-	YokiWebhookKeys string
-	SudyWebhookKeys string
+	YokiWebhookKeys   string
+	SudyWebhookKeys   string
+	ShirlyWebhookKeys string
 
 	// Sandbox / simulate-settlement module (Dolos admin account).
 	// When DolosEmail is empty the sandbox endpoints return 503.
@@ -60,6 +61,11 @@ func (c Config) SudyWebhookSecrets() []string {
 	return splitSecrets(c.SudyWebhookKeys)
 }
 
+// ShirlyWebhookSecrets returns the Shirly signing secrets (new first for rotation).
+func (c Config) ShirlyWebhookSecrets() []string {
+	return splitSecrets(c.ShirlyWebhookKeys)
+}
+
 func splitSecrets(raw string) []string {
 	var out []string
 	for _, s := range strings.Split(raw, ",") {
@@ -91,6 +97,7 @@ func Load() Config {
 		ReconcileInterval: reconcile,
 		YokiWebhookKeys:      env("YOKI_WEBHOOK_SECRET", ""),
 		SudyWebhookKeys:      env("SUDY_WEBHOOK_SECRET", ""),
+		ShirlyWebhookKeys:    env("SHIRLY_WEBHOOK_SECRET", ""),
 		DolosEmail:           env("DOLOS_EMAIL", ""),
 		DolosPassword:        env("DOLOS_PASSWORD", ""),
 		AdminBaseURL:         env("ADMIN_BASE_URL", ""),

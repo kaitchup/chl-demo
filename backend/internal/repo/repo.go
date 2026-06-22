@@ -329,12 +329,13 @@ func (r *Repo) ListPendingOrders(ctx context.Context) ([]Order, error) {
 }
 
 // SaveRawWebhook persists raw request headers and body before any processing.
+// source identifies the originating merchant ("upay", "yoki", "sudy", "shirly", …).
 // Returns the generated log id, which should be threaded into InsertWebhookEvent.
-func (r *Repo) SaveRawWebhook(ctx context.Context, headers, rawBody []byte) (int64, error) {
+func (r *Repo) SaveRawWebhook(ctx context.Context, headers, rawBody []byte, source string) (int64, error) {
 	var id int64
 	err := r.pool.QueryRow(ctx,
-		`INSERT INTO webhook_raw_log(req_headers, raw_body) VALUES($1, $2) RETURNING id`,
-		headers, rawBody,
+		`INSERT INTO webhook_raw_log(req_headers, raw_body, source) VALUES($1, $2, $3) RETURNING id`,
+		headers, rawBody, source,
 	).Scan(&id)
 	return id, err
 }
@@ -351,11 +352,12 @@ func (r *Repo) UpdateWebhookLog(ctx context.Context, id int64, eventType, respBo
 
 // InsertWebhookEvent records an event; returns inserted=false if the event id was
 // already seen (idempotent dedupe via UNIQUE(upay_event_id)).
-func (r *Repo) InsertWebhookEvent(ctx context.Context, eventID, payID, eventType string, payload []byte, rawLogID int64) (inserted bool, err error) {
+// source should match the value stored in the corresponding webhook_raw_log row.
+func (r *Repo) InsertWebhookEvent(ctx context.Context, eventID, payID, eventType string, payload []byte, rawLogID int64, source string) (inserted bool, err error) {
 	tag, err := r.pool.Exec(ctx,
-		`INSERT INTO webhook_events(upay_event_id, upay_payment_id, event_type, payload, signature_valid, raw_log_id)
-		 VALUES($1,$2,$3,$4,true,$5) ON CONFLICT (upay_event_id) DO NOTHING`,
-		eventID, payID, eventType, payload, rawLogID)
+		`INSERT INTO webhook_events(upay_event_id, upay_payment_id, event_type, payload, signature_valid, raw_log_id, source)
+		 VALUES($1,$2,$3,$4,true,$5,$6) ON CONFLICT (upay_event_id) DO NOTHING`,
+		eventID, payID, eventType, payload, rawLogID, source)
 	if err != nil {
 		return false, err
 	}

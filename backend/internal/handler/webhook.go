@@ -13,9 +13,9 @@ import (
 
 // LogOnlyWebhook returns a handler that logs every inbound UPay event for the
 // given merchant secrets without triggering any business logic. The secrets
-// slice is injected at route-registration time so the same handler covers any
-// number of merchants without code duplication.
-func (h *Handler) LogOnlyWebhook(secrets []string) echo.HandlerFunc {
+// slice and source name are injected at route-registration time so the same
+// handler covers any number of merchants without code duplication.
+func (h *Handler) LogOnlyWebhook(secrets []string, source string) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		raw, err := io.ReadAll(c.Request().Body)
 		if err != nil {
@@ -25,7 +25,7 @@ func (h *Handler) LogOnlyWebhook(secrets []string) echo.HandlerFunc {
 		ctx := c.Request().Context()
 
 		hdrJSON, _ := json.Marshal(c.Request().Header)
-		logID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, raw)
+		logID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, raw, source)
 		if err != nil {
 			return c.NoContent(http.StatusInternalServerError)
 		}
@@ -64,7 +64,7 @@ func (h *Handler) UpayWebhook(c echo.Context) error {
 	// 0) Persist raw headers + body immediately, before any validation that
 	//    might short-circuit the handler (bad sig, parse error, etc.).
 	hdrJSON, _ := json.Marshal(c.Request().Header)
-	rawLogID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, raw)
+	rawLogID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, raw, "upay")
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -87,7 +87,7 @@ func (h *Handler) UpayWebhook(c echo.Context) error {
 	}
 
 	// 3) Idempotent dedupe on event.id (delivery is at-least-once).
-	inserted, err := h.repo.InsertWebhookEvent(ctx, evt.ID, evt.Data.ID, evt.Event, raw, rawLogID)
+	inserted, err := h.repo.InsertWebhookEvent(ctx, evt.ID, evt.Data.ID, evt.Event, raw, rawLogID, "upay")
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
