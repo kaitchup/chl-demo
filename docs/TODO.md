@@ -17,6 +17,18 @@
   - 依赖：UPay 测试环境仅经 NetBird VPN 可达；CA 在 [`certs/upay-local-ca.crt`](../certs/upay-local-ca.crt)
   - 设计细节见 [TECH-DESIGN-技术方案.md](TECH-DESIGN-技术方案.md) §6 / §9
 
+## 沙盒 / 开发体验
+
+- [ ] **去掉模拟到账表单中的 `payment_request_id` 手填项**
+  - 背景：当前新建模拟需手动填写平台订单 ID（`pay_...`），对商户无语义且易出错。
+  - 目标：用下拉选择替代手填，用户只需选一条挂单，`payment_request_id` 和 `to_address` 均自动填入。
+  - 技术方案（已调研）：
+    - `payment_request_id`：从本地 `orders.upay_payment_id` 下拉选取（方案 A，随时可做）
+    - `to_address`：需从 UPay admin API 通过 payment request ID 查回收款地址；admin API **当前不支持**此查询
+    - UPay 测试库中 `payment_order.receive_address`（关联 `payment_order.request_id`）即为所需字段，但 chl-demo 后端不直连第三方 DB
+  - **触发条件**：UPay admin API 支持通过 `payment_request_id`（或 `to_address`）查询收款地址后启动
+  - 相关文件：`frontend/src/pages/sandbox/SimulationNew.tsx`、`backend/internal/handler/sandbox.go`、`backend/internal/admin/client.go`
+
 ## 部署 / 运维
 
 - [x] **1. 用 nginx + docker-compose 部署到 hostVDS**

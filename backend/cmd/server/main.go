@@ -88,8 +88,9 @@ func main() {
 	// api.POST("/auth/register", h.Register)
 	api.POST("/auth/login", h.Login)
 	api.GET("/plans", h.ListPlans)
-	api.POST("/webhooks/upay", h.UpayWebhook)   // public; authenticated via HMAC signature
-	api.POST("/webhooks/yoki", h.YokiWebhook)   // public; authenticated via HMAC signature
+	api.POST("/webhooks/upay", h.UpayWebhook)                                      // public; authenticated via HMAC signature
+	api.POST("/webhooks/yoki", h.LogOnlyWebhook(cfg.YokiWebhookSecrets()))         // public; authenticated via HMAC signature
+	api.POST("/webhooks/sudy", h.LogOnlyWebhook(cfg.SudyWebhookSecrets()))         // public; authenticated via HMAC signature
 
 	auth := api.Group("", middleware.JWT(cfg.JWTSecret))
 	auth.GET("/me", h.Me)

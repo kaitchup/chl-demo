@@ -22,8 +22,9 @@ type Config struct {
 	UpayCACertPath    string
 	ReconcileInterval time.Duration
 
-	// Yoki merchant webhook secret (comma-separated for rotation).
+	// Per-merchant webhook secrets (comma-separated for rotation).
 	YokiWebhookKeys string
+	SudyWebhookKeys string
 
 	// Sandbox / simulate-settlement module (Dolos admin account).
 	// When DolosEmail is empty the sandbox endpoints return 503.
@@ -52,6 +53,11 @@ func (c Config) WebhookSecrets() []string {
 // YokiWebhookSecrets returns the Yoki signing secrets (new first for rotation).
 func (c Config) YokiWebhookSecrets() []string {
 	return splitSecrets(c.YokiWebhookKeys)
+}
+
+// SudyWebhookSecrets returns the Sudy signing secrets (new first for rotation).
+func (c Config) SudyWebhookSecrets() []string {
+	return splitSecrets(c.SudyWebhookKeys)
 }
 
 func splitSecrets(raw string) []string {
@@ -84,6 +90,7 @@ func Load() Config {
 		UpayCACertPath:    env("UPAY_CA_CERT", ""),
 		ReconcileInterval: reconcile,
 		YokiWebhookKeys:      env("YOKI_WEBHOOK_SECRET", ""),
+		SudyWebhookKeys:      env("SUDY_WEBHOOK_SECRET", ""),
 		DolosEmail:           env("DOLOS_EMAIL", ""),
 		DolosPassword:        env("DOLOS_PASSWORD", ""),
 		AdminBaseURL:         env("ADMIN_BASE_URL", ""),
