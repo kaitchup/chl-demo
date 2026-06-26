@@ -570,6 +570,54 @@ func (r *Repo) ConfirmRefund(ctx context.Context, upayRefundID string) error {
 	return err
 }
 
+// ---- production merchant webhooks ----
+
+// ExistsWebhookTestMerchant checks whether an event_id has already been persisted
+// for mch_test_merchant (application-layer dedup).
+func (r *Repo) ExistsWebhookTestMerchant(ctx context.Context, eventID string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM webhook_test_merchant WHERE event_id=$1)`,
+		eventID).Scan(&exists)
+	return exists, err
+}
+
+// InsertWebhookTestMerchant persists a validated, non-duplicate event for
+// mch_test_merchant. Returns ErrConflict on unique violation (race-condition dedup).
+func (r *Repo) InsertWebhookTestMerchant(ctx context.Context, eventID, headers, body, eventType string) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO webhook_test_merchant(event_id, req_headers, raw_body, event_type)
+		 VALUES($1,$2,$3,$4)`,
+		eventID, headers, body, eventType)
+	if isUnique(err) {
+		return ErrConflict
+	}
+	return err
+}
+
+// ExistsWebhookProdDummy checks whether an event_id has already been persisted
+// for prod_dummy1 (application-layer dedup).
+func (r *Repo) ExistsWebhookProdDummy(ctx context.Context, eventID string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM webhook_prod_dummy WHERE event_id=$1)`,
+		eventID).Scan(&exists)
+	return exists, err
+}
+
+// InsertWebhookProdDummy persists a validated, non-duplicate event for prod_dummy1.
+// Returns ErrConflict on unique violation (race-condition dedup).
+func (r *Repo) InsertWebhookProdDummy(ctx context.Context, eventID, headers, body, eventType string) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO webhook_prod_dummy(event_id, req_headers, raw_body, event_type)
+		 VALUES($1,$2,$3,$4)`,
+		eventID, headers, body, eventType)
+	if isUnique(err) {
+		return ErrConflict
+	}
+	return err
+}
+
 // MarkRefundFailed updates a refund to FAILED.
 func (r *Repo) MarkRefundFailed(ctx context.Context, upayRefundID string) error {
 	_, err := r.pool.Exec(ctx,

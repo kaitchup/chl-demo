@@ -92,6 +92,12 @@ func main() {
 	api.POST("/webhooks/yoki", h.LogOnlyWebhook(cfg.YokiWebhookSecrets(), "yoki"))       // public; authenticated via HMAC signature
 	api.POST("/webhooks/sudy", h.LogOnlyWebhook(cfg.SudyWebhookSecrets(), "sudy"))       // public; authenticated via HMAC signature
 	api.POST("/webhooks/shirly", h.LogOnlyWebhook(cfg.ShirlyWebhookSecrets(), "shirly")) // public; authenticated via HMAC signature
+	api.POST("/webhooks/mch_test_merchant", h.ProdWebhook(                               // production; sig-first + dedup
+		cfg.TestMerchantWebhookSecrets(), r.ExistsWebhookTestMerchant, r.InsertWebhookTestMerchant,
+	))
+	api.POST("/webhooks/prod_dummy1", h.ProdWebhook( // production; sig-first + dedup
+		cfg.ProdDummy1WebhookSecrets(), r.ExistsWebhookProdDummy, r.InsertWebhookProdDummy,
+	))
 
 	auth := api.Group("", middleware.JWT(cfg.JWTSecret))
 	auth.GET("/me", h.Me)
