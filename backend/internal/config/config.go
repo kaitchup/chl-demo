@@ -23,11 +23,12 @@ type Config struct {
 	ReconcileInterval time.Duration
 
 	// Per-merchant webhook secrets (comma-separated for rotation).
-	YokiWebhookKeys          string
-	SudyWebhookKeys          string
-	ShirlyWebhookKeys        string
-	TestMerchantWebhookKeys  string
-	ProdDummy1WebhookKeys    string
+	YokiWebhookKeys         string
+	SudyWebhookKeys         string
+	ShirlyWebhookKeys       string
+	TiaWebhookKeys          string
+	TestMerchantWebhookKeys string
+	ProdDummy1WebhookKeys   string
 
 	// Sandbox / simulate-settlement module (Dolos admin account).
 	// When DolosEmail is empty the sandbox endpoints return 503.
@@ -68,6 +69,11 @@ func (c Config) ShirlyWebhookSecrets() []string {
 	return splitSecrets(c.ShirlyWebhookKeys)
 }
 
+// TiaWebhookSecrets returns the Tia signing secrets (new first for rotation).
+func (c Config) TiaWebhookSecrets() []string {
+	return splitSecrets(c.TiaWebhookKeys)
+}
+
 // TestMerchantWebhookSecrets returns the mch_test_merchant signing secrets (new first for rotation).
 func (c Config) TestMerchantWebhookSecrets() []string {
 	return splitSecrets(c.TestMerchantWebhookKeys)
@@ -98,25 +104,26 @@ func Load() Config {
 		reconcile = 60 * time.Second
 	}
 	return Config{
-		DatabaseURL:       env("DATABASE_URL", "postgres://chl:chl@localhost:5432/chl?sslmode=disable"),
-		JWTSecret:         env("JWT_SECRET", "dev-secret-change-me"),
-		JWTTTL:            ttl,
-		PublicBaseURL:     env("PUBLIC_BASE_URL", "http://localhost"),
-		UpayBaseURL:       env("UPAY_BASE_URL", ""),
-		UpayAPIKey:        env("UPAY_API_KEY", ""),
-		UpayWebhookKeys:   env("UPAY_WEBHOOK_SECRET", ""),
-		UpayCACertPath:    env("UPAY_CA_CERT", ""),
-		ReconcileInterval: reconcile,
+		DatabaseURL:             env("DATABASE_URL", "postgres://chl:chl@localhost:5432/chl?sslmode=disable"),
+		JWTSecret:               env("JWT_SECRET", "dev-secret-change-me"),
+		JWTTTL:                  ttl,
+		PublicBaseURL:           env("PUBLIC_BASE_URL", "http://localhost"),
+		UpayBaseURL:             env("UPAY_BASE_URL", ""),
+		UpayAPIKey:              env("UPAY_API_KEY", ""),
+		UpayWebhookKeys:         env("UPAY_WEBHOOK_SECRET", ""),
+		UpayCACertPath:          env("UPAY_CA_CERT", ""),
+		ReconcileInterval:       reconcile,
 		YokiWebhookKeys:         env("YOKI_WEBHOOK_SECRET", ""),
 		SudyWebhookKeys:         env("SUDY_WEBHOOK_SECRET", ""),
 		ShirlyWebhookKeys:       env("SHIRLY_WEBHOOK_SECRET", ""),
+		TiaWebhookKeys:          env("TIA_WEBHOOK_SECRET", ""),
 		TestMerchantWebhookKeys: env("TEST_MERCHANT_WEBHOOK_SECRET", ""),
 		ProdDummy1WebhookKeys:   env("PROD_DUMMY1_WEBHOOK_SECRET", ""),
-		DolosEmail:           env("DOLOS_EMAIL", ""),
-		DolosPassword:        env("DOLOS_PASSWORD", ""),
-		AdminBaseURL:         env("ADMIN_BASE_URL", ""),
-		MerchantAdminBaseURL: env("MERCHANT_ADMIN_BASE_URL", ""),
-		SandboxMaxAMLRetries: envInt("SANDBOX_MAX_AML_RETRIES", 3),
+		DolosEmail:              env("DOLOS_EMAIL", ""),
+		DolosPassword:           env("DOLOS_PASSWORD", ""),
+		AdminBaseURL:            env("ADMIN_BASE_URL", ""),
+		MerchantAdminBaseURL:    env("MERCHANT_ADMIN_BASE_URL", ""),
+		SandboxMaxAMLRetries:    envInt("SANDBOX_MAX_AML_RETRIES", 3),
 	}
 }
 
