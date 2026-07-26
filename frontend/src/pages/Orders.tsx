@@ -15,6 +15,33 @@ function shorten(id: string): string {
   return id.length <= 16 ? id : `${id.slice(0, 8)}…${id.slice(-8)}`;
 }
 
+const kycLabel: Record<string, { text: string; cls: string }> = {
+  NONE: { text: "免 KYC", cls: "bg-emerald-50 text-emerald-600" },
+  INIT: { text: "KYC 待发起", cls: "bg-slate-100 text-slate-500" },
+  PENDING: { text: "KYC 审核中", cls: "bg-amber-50 text-amber-600" },
+  APPROVED: { text: "KYC 通过", cls: "bg-emerald-50 text-emerald-600" },
+  REJECTED: { text: "KYC 拒绝", cls: "bg-red-50 text-red-600" },
+  EXPIRED: { text: "KYC 过期", cls: "bg-slate-100 text-slate-500" },
+};
+
+function KycBadge({ o }: { o: { uid: string | null; kyc_status: string | null; kyc_first_name: string | null; kyc_last_name: string | null } }) {
+  const k = o.kyc_status ? kycLabel[o.kyc_status] : null;
+  const name = o.kyc_first_name || o.kyc_last_name ? ` · ${o.kyc_last_name ?? ""}${o.kyc_first_name ?? ""}` : "";
+  return (
+    <span className="inline-flex flex-col items-start gap-0.5">
+      {k ? (
+        <span className={`px-1.5 py-0.5 rounded text-xs ${k.cls}`} title={o.kyc_status ?? undefined}>
+          {k.text}
+          {name}
+        </span>
+      ) : (
+        <span className="text-xs text-slate-300">—</span>
+      )}
+      <span className="text-xs text-slate-400">{o.uid ? `uid: ${o.uid}` : "无 uid"}</span>
+    </span>
+  );
+}
+
 function OrderId({ id }: { id: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -213,6 +240,7 @@ export default function Orders() {
               <th className="text-left px-4 py-2">周期</th>
               <th className="text-left px-4 py-2">金额</th>
               <th className="text-left px-4 py-2">状态</th>
+              <th className="text-left px-4 py-2">KYC</th>
               <th className="text-left px-4 py-2">创建时间</th>
               <th className="px-4 py-2"></th>
             </tr>
@@ -224,6 +252,7 @@ export default function Orders() {
                 <td className="px-4 py-2">{o.plan_code}</td>
                 <td className="px-4 py-2">{o.amount} {o.currency}</td>
                 <td className="px-4 py-2">{statusLabel[o.status] || o.status}</td>
+                <td className="px-4 py-2"><KycBadge o={o} /></td>
                 <td className="px-4 py-2">{new Date(o.created_at).toLocaleString()}</td>
                 <td className="px-4 py-2 text-right space-x-3">
                   {o.status === "PENDING" && (
@@ -254,7 +283,7 @@ export default function Orders() {
             ))}
             {orders.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                   暂无订单
                 </td>
               </tr>

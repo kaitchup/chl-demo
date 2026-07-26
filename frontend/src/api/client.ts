@@ -46,10 +46,15 @@ export interface Member {
 export interface Order {
   row_id: number;
   order_id: string;
+  uid: string | null; // uid sent to UPay; null = order created without uid (per-order KYC)
   plan_code: string;
   amount: string;
   currency: string;
   status: string;
+  payment_status: string | null;
+  kyc_status: string | null; // NONE | INIT | PENDING | APPROVED | REJECTED | EXPIRED
+  kyc_first_name: string | null;
+  kyc_last_name: string | null;
   received_amount: string;
   checkout_url: string | null;
   created_at: string;
@@ -90,8 +95,8 @@ export const apiClient = {
   me: () => api.get("/me").then((r) => unwrap<{ email: string; member: Member }>(r.data)),
   plans: () => api.get("/plans").then((r) => unwrap<Plan[]>(r.data)),
   subscription: () => api.get("/subscription").then((r) => unwrap<Member>(r.data)),
-  createOrder: (plan_code: string) =>
-    api.post("/orders", { plan_code }).then((r) => unwrap<{ order_id: string; checkout_url: string }>(r.data)),
+  createOrder: (plan_code: string, send_uid = true) =>
+    api.post("/orders", { plan_code, send_uid }).then((r) => unwrap<{ order_id: string; checkout_url: string }>(r.data)),
   orders: (params?: { beforeId?: number; includeExpired?: boolean }) =>
     api
       .get("/orders", {

@@ -93,10 +93,15 @@ func orderView(o repo.Order) map[string]any {
 		"row_id":          o.ID,
 		"order_id":        o.MerchantOrderID,
 		"upay_payment_id": o.UpayPaymentID,
+		"uid":             o.UpayUID,
 		"plan_code":       o.PlanCode,
 		"amount":          o.Amount,
 		"currency":        o.Currency,
 		"status":          displayStatus(o),
+		"payment_status":  o.PaymentStatus,
+		"kyc_status":      o.KycStatus,
+		"kyc_first_name":  o.KycFirstName,
+		"kyc_last_name":   o.KycLastName,
 		"received_amount": o.ReceivedAmount,
 		"failure_code":    o.FailureCode,
 		"checkout_url":    o.CheckoutURL,
@@ -106,16 +111,20 @@ func orderView(o repo.Order) map[string]any {
 	}
 }
 
-// CreateOrder (v0.0.1): persists a PENDING order and returns a placeholder
-// checkout URL. Real UPay order creation lands in v0.0.2.
+// CreateOrder persists a PENDING order, then creates the UPay order (real mode)
+// or a placeholder checkout (no UPay configured). send_uid (default true) controls
+// whether the UPay order carries our stable per-user uid — with uid, KYC is done
+// once per user; without, UPay requires KYC per merchant_order_id (test scenario).
 func (h *Handler) CreateOrder(c echo.Context) error {
 	uid := middleware.UserID(c)
 	var in struct {
 		PlanCode string `json:"plan_code"`
+		SendUID  *bool  `json:"send_uid"`
 	}
 	if err := c.Bind(&in); err != nil {
 		return fail(c, http.StatusBadRequest, "invalid_request", "malformed body")
 	}
+	withUID := in.SendUID == nil || *in.SendUID
 
 	plan, err := h.repo.GetPlan(c.Request().Context(), in.PlanCode)
 	if errors.Is(err, repo.ErrNotFound) {
@@ -129,7 +138,7 @@ func (h *Handler) CreateOrder(c echo.Context) error {
 
 	// Reuse an existing open UPay order to avoid duplicate checkouts (real mode only).
 	if h.upay != nil {
-		if ord, err := h.repo.ReuseOpenOrder(ctx, uid, plan.Code); err == nil && ord.CheckoutURL != nil {
+		if ord, err := h.repo.ReuseOpenOrder(ctx, uid, plan.Code, withUID); err == nil && ord.CheckoutURL != nil {
 			return ok(c, map[string]any{
 				"order_id": ord.MerchantOrderID, "checkout_url": *ord.CheckoutURL,
 				"expires_at": ord.ExpiresAt, "reused": true,
@@ -140,9 +149,16 @@ func (h *Handler) CreateOrder(c echo.Context) error {
 	moid := randID("sub_")
 	idemKey := moid + ":create"
 
+	var upayUID *string
+	if withUID {
+		v := fmt.Sprintf("user-%d", uid) // stable, no PII — never email
+		upayUID = &v
+	}
+
 	// Persist the local order first (PENDING) so we never lose track of a payment.
 	o := repo.Order{
 		MerchantOrderID: moid,
+		UpayUID:         upayUID,
 		PlanCode:        plan.Code,
 		Amount:          plan.Amount,
 		Currency:        plan.Currency,
@@ -165,8 +181,13 @@ func (h *Handler) CreateOrder(c echo.Context) error {
 
 	// Real mode: create the UPay order and attach its checkout URL.
 	resultURL := h.cfg.PublicBaseURL + "/checkout/" + moid + "/result"
+	var uidValue string
+	if upayUID != nil {
+		uidValue = *upayUID
+	}
 	reqBody, respBody, up, err := h.upay.CreateOrder(upay.CreateOrderReq{
 		MerchantOrderID:  moid,
+		UID:              uidValue,
 		Amount:           plan.Amount, // already "20.00" form from numeric::text
 		Currency:         plan.Currency,
 		Description:      plan.Name,

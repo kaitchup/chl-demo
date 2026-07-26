@@ -34,17 +34,59 @@ func (s *PaymentService) Sync(ctx context.Context, o *upay.Order) error {
 	return s.apply(ctx, o)
 }
 
-func (s *PaymentService) apply(ctx context.Context, o *upay.Order) error {
-	// UPay lifecycle status (2026-06 naming): INITED | PROCESSING | COMPLETED | CANCELED.
-	// PAID is the compat alias for COMPLETED returned during the 3-month deprecation window.
-	// Expiry is no longer a status: an "expired" local order can still settle on-chain,
-	// so we keep polling until UPay reports COMPLETED/PAID or CANCELED.
+// action is the local consequence of a UPay order state.
+type action int
+
+const (
+	actWait     action = iota // stay PENDING, record partial arrival if any
+	actActivate               // fully paid — activate membership
+	actTerminal               // terminal without activation
+)
+
+// classify maps a UPay order (2026-05-04 doc) to a local action.
+// Fulfillment follows payment_status (PAID/OVERPAID both count as paid in full);
+// status COMPLETED/PAID is the fallback for responses predating payment_status.
+// Expiry is not a status: an "expired" local order can still settle on-chain,
+// so anything non-terminal keeps polling.
+func classify(o *upay.Order) (act action, reason string) {
+	paid := o.PaymentStatus == "PAID" || o.PaymentStatus == "OVERPAID"
 	switch o.Status {
 	case "COMPLETED", "PAID":
-		return s.repo.ActivateMembership(ctx, o.ID, parseTime(o.PaidAt))
+		return actActivate, ""
+	case "CLOSED": // settlement archive — activate only if it closed fully paid
+		if paid {
+			return actActivate, ""
+		}
+		return actTerminal, "closed_unpaid"
 	case "CANCELED":
-		return s.repo.MarkOrderTerminal(ctx, o.ID, "CANCELED", o.CancelReason)
-	default: // INITED / PROCESSING — record any partial arrival, stay PENDING
+		return actTerminal, o.CancelReason
+	case "REJECTED": // payer failed KYC / compliance rejection
+		return actTerminal, "kyc_rejected"
+	default: // INITED / PENDING_APPROVAL / REJECTING / PROCESSING
+		if paid {
+			return actActivate, ""
+		}
+		return actWait, ""
+	}
+}
+
+func (s *PaymentService) apply(ctx context.Context, o *upay.Order) error {
+	// Always persist the KYC / payment_status snapshot first — it is the evidence
+	// trail for the uid-vs-KYC scenarios and is filled in regardless of lifecycle.
+	if err := s.repo.SaveUpayOrderState(ctx, o.ID, o.PaymentStatus, o.KycStatus,
+		o.CustomerKycFirstName, o.CustomerKycLastName); err != nil {
+		return err
+	}
+
+	act, reason := classify(o)
+	switch act {
+	case actActivate:
+		return s.repo.ActivateMembership(ctx, o.ID, parseTime(o.PaidAt))
+	case actTerminal:
+		// Local terminal vocabulary is CANCELED (+failure_code); UPay's
+		// CLOSED/REJECTED specifics live in the reason.
+		return s.repo.MarkOrderTerminal(ctx, o.ID, "CANCELED", reason)
+	default:
 		if o.ReceivedAmount != "" {
 			return s.repo.UpdateReceived(ctx, o.ID, o.ReceivedAmount)
 		}

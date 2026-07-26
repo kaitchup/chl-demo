@@ -44,10 +44,15 @@ type Order struct {
 	ID              int64 // internal row id; used as pagination cursor
 	MerchantOrderID string
 	UpayPaymentID   *string
+	UpayUID         *string // uid sent to UPay on create; NULL = order created without uid
 	PlanCode        string
 	Amount          string
 	Currency        string
 	Status          string
+	PaymentStatus   *string // UPay payment_status snapshot (UNPAID/PARTIAL/PAID/OVERPAID)
+	KycStatus       *string // UPay kyc_status snapshot (NONE/INIT/PENDING/APPROVED/REJECTED/EXPIRED)
+	KycFirstName    *string
+	KycLastName     *string
 	ReceivedAmount  string
 	FailureCode     *string
 	CheckoutURL     *string
@@ -167,10 +172,10 @@ func (r *Repo) GetSubscription(ctx context.Context, userID int64) (Subscription,
 
 func (r *Repo) CreateOrder(ctx context.Context, o Order, userID int64, idemKey string) error {
 	_, err := r.pool.Exec(ctx,
-		`INSERT INTO orders(merchant_order_id, upay_payment_id, user_id, plan_code,
+		`INSERT INTO orders(merchant_order_id, upay_payment_id, upay_uid, user_id, plan_code,
 		                    amount, currency, status, checkout_url, idempotency_key, expires_at)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-		o.MerchantOrderID, o.UpayPaymentID, userID, o.PlanCode,
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+		o.MerchantOrderID, o.UpayPaymentID, o.UpayUID, userID, o.PlanCode,
 		o.Amount, o.Currency, o.Status, o.CheckoutURL, idemKey, o.ExpiresAt)
 	if isUnique(err) {
 		return ErrConflict
@@ -180,8 +185,9 @@ func (r *Repo) CreateOrder(ctx context.Context, o Order, userID int64, idemKey s
 
 func (r *Repo) ListOrders(ctx context.Context, userID int64) ([]Order, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT merchant_order_id, upay_payment_id, plan_code, amount::text, currency,
-		        status, received_amount::text, failure_code, checkout_url,
+		`SELECT merchant_order_id, upay_payment_id, upay_uid, plan_code, amount::text, currency,
+		        status, payment_status, kyc_status, kyc_first_name, kyc_last_name,
+		        received_amount::text, failure_code, checkout_url,
 		        created_at, paid_at, expires_at
 		   FROM orders WHERE user_id=$1 ORDER BY created_at DESC`, userID)
 	if err != nil {
@@ -205,8 +211,9 @@ func (r *Repo) ListOrders(ctx context.Context, userID int64) ([]Order, error) {
 // has_more=true means there are more rows to fetch.
 func (r *Repo) ListOrdersPage(ctx context.Context, userID int64, beforeID int64, includeExpired bool, limit int) ([]Order, bool, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, merchant_order_id, upay_payment_id, plan_code, amount::text, currency,
-		        status, received_amount::text, failure_code, checkout_url,
+		`SELECT id, merchant_order_id, upay_payment_id, upay_uid, plan_code, amount::text, currency,
+		        status, payment_status, kyc_status, kyc_first_name, kyc_last_name,
+		        received_amount::text, failure_code, checkout_url,
 		        created_at, paid_at, expires_at
 		   FROM orders
 		  WHERE user_id=$1
@@ -223,8 +230,9 @@ func (r *Repo) ListOrdersPage(ctx context.Context, userID int64, beforeID int64,
 	var out []Order
 	for rows.Next() {
 		var o Order
-		if err := rows.Scan(&o.ID, &o.MerchantOrderID, &o.UpayPaymentID, &o.PlanCode, &o.Amount, &o.Currency,
-			&o.Status, &o.ReceivedAmount, &o.FailureCode, &o.CheckoutURL,
+		if err := rows.Scan(&o.ID, &o.MerchantOrderID, &o.UpayPaymentID, &o.UpayUID, &o.PlanCode, &o.Amount, &o.Currency,
+			&o.Status, &o.PaymentStatus, &o.KycStatus, &o.KycFirstName, &o.KycLastName,
+			&o.ReceivedAmount, &o.FailureCode, &o.CheckoutURL,
 			&o.CreatedAt, &o.PaidAt, &o.ExpiresAt); err != nil {
 			return nil, false, err
 		}
@@ -242,8 +250,9 @@ func (r *Repo) ListOrdersPage(ctx context.Context, userID int64, beforeID int64,
 
 func (r *Repo) GetOrder(ctx context.Context, userID int64, moid string) (Order, error) {
 	row := r.pool.QueryRow(ctx,
-		`SELECT merchant_order_id, upay_payment_id, plan_code, amount::text, currency,
-		        status, received_amount::text, failure_code, checkout_url,
+		`SELECT merchant_order_id, upay_payment_id, upay_uid, plan_code, amount::text, currency,
+		        status, payment_status, kyc_status, kyc_first_name, kyc_last_name,
+		        received_amount::text, failure_code, checkout_url,
 		        created_at, paid_at, expires_at
 		   FROM orders WHERE user_id=$1 AND merchant_order_id=$2`, userID, moid)
 	o, err := scanOrder(row)
@@ -259,8 +268,9 @@ type scanner interface {
 
 func scanOrder(s scanner) (Order, error) {
 	var o Order
-	err := s.Scan(&o.MerchantOrderID, &o.UpayPaymentID, &o.PlanCode, &o.Amount, &o.Currency,
-		&o.Status, &o.ReceivedAmount, &o.FailureCode, &o.CheckoutURL,
+	err := s.Scan(&o.MerchantOrderID, &o.UpayPaymentID, &o.UpayUID, &o.PlanCode, &o.Amount, &o.Currency,
+		&o.Status, &o.PaymentStatus, &o.KycStatus, &o.KycFirstName, &o.KycLastName,
+		&o.ReceivedAmount, &o.FailureCode, &o.CheckoutURL,
 		&o.CreatedAt, &o.PaidAt, &o.ExpiresAt)
 	return o, err
 }
@@ -277,6 +287,21 @@ func (r *Repo) SaveUpayBodies(ctx context.Context, moid string, req, resp []byte
 	return err
 }
 
+// SaveUpayOrderState persists the KYC / payment_status snapshot from a UPay
+// order query. Empty strings are stored as NULL so a sparse upstream response
+// never overwrites a previously recorded value with "".
+func (r *Repo) SaveUpayOrderState(ctx context.Context, payID, paymentStatus, kycStatus, kycFirst, kycLast string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE orders
+		    SET payment_status = COALESCE(NULLIF($2,''), payment_status),
+		        kyc_status     = COALESCE(NULLIF($3,''), kyc_status),
+		        kyc_first_name = COALESCE(NULLIF($4,''), kyc_first_name),
+		        kyc_last_name  = COALESCE(NULLIF($5,''), kyc_last_name)
+		  WHERE upay_payment_id=$1`,
+		payID, paymentStatus, kycStatus, kycFirst, kycLast)
+	return err
+}
+
 // AttachUpayResult stores the UPay order id / checkout url / expiry on a local order.
 func (r *Repo) AttachUpayResult(ctx context.Context, moid, payID, checkoutURL string, expiresAt *time.Time) error {
 	// NULLIF keeps placeholder-mode orders (empty payID) out of the reconcile set,
@@ -290,15 +315,19 @@ func (r *Repo) AttachUpayResult(ctx context.Context, moid, payID, checkoutURL st
 
 // ReuseOpenOrder returns the user's most recent reusable PENDING order for the
 // given plan (not expired), or ErrNotFound. Used to avoid duplicate UPay orders.
-func (r *Repo) ReuseOpenOrder(ctx context.Context, userID int64, planCode string) (Order, error) {
+// withUID must match how the order was created: uid-carrying and uid-less orders
+// have different KYC semantics at UPay, so they never substitute for each other.
+func (r *Repo) ReuseOpenOrder(ctx context.Context, userID int64, planCode string, withUID bool) (Order, error) {
 	row := r.pool.QueryRow(ctx,
-		`SELECT merchant_order_id, upay_payment_id, plan_code, amount::text, currency,
-		        status, received_amount::text, failure_code, checkout_url,
+		`SELECT merchant_order_id, upay_payment_id, upay_uid, plan_code, amount::text, currency,
+		        status, payment_status, kyc_status, kyc_first_name, kyc_last_name,
+		        received_amount::text, failure_code, checkout_url,
 		        created_at, paid_at, expires_at
 		   FROM orders
 		  WHERE user_id=$1 AND plan_code=$2 AND status='PENDING' AND upay_payment_id IS NOT NULL
+		        AND (upay_uid IS NOT NULL) = $3
 		        AND expires_at > now()
-		  ORDER BY created_at DESC LIMIT 1`, userID, planCode)
+		  ORDER BY created_at DESC LIMIT 1`, userID, planCode, withUID)
 	o, err := scanOrder(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return o, ErrNotFound
@@ -309,8 +338,9 @@ func (r *Repo) ReuseOpenOrder(ctx context.Context, userID int64, planCode string
 // ListPendingOrders returns PENDING orders that have a UPay id (for reconcile).
 func (r *Repo) ListPendingOrders(ctx context.Context) ([]Order, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT merchant_order_id, upay_payment_id, plan_code, amount::text, currency,
-		        status, received_amount::text, failure_code, checkout_url,
+		`SELECT merchant_order_id, upay_payment_id, upay_uid, plan_code, amount::text, currency,
+		        status, payment_status, kyc_status, kyc_first_name, kyc_last_name,
+		        received_amount::text, failure_code, checkout_url,
 		        created_at, paid_at, expires_at
 		   FROM orders WHERE status='PENDING' AND upay_payment_id IS NOT NULL AND upay_payment_id <> ''`)
 	if err != nil {

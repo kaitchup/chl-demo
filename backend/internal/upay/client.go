@@ -56,8 +56,9 @@ func New(baseURL, apiKey, caPath string) (*Client, error) {
 // CreateOrderReq is the POST /v1/payment/request body.
 type CreateOrderReq struct {
 	MerchantOrderID  string            `json:"merchant_order_id"`
-	Amount           string            `json:"amount"`   // "20.00"
-	Currency         string            `json:"currency"` // fiat code, e.g. "USD"
+	UID              string            `json:"uid,omitempty"` // merchant-side user id (≤128); same user must always send the same value. Empty = per-order KYC keyed by merchant_order_id.
+	Amount           string            `json:"amount"`        // "20.00"
+	Currency         string            `json:"currency"`      // fiat code, e.g. "USD"
 	Description      string            `json:"description,omitempty"`
 	ExpiresInSeconds int               `json:"expires_in_seconds,omitempty"` // 1800..3600
 	SuccessURL       string            `json:"success_url,omitempty"`
@@ -72,13 +73,21 @@ type Order struct {
 	MerchantOrderID string `json:"merchant_order_id"`
 	Amount          string `json:"amount"`
 	Currency        string `json:"currency"`
-	Status          string `json:"status"`        // INITED | PROCESSING | COMPLETED | CANCELED (PAID = compat alias for COMPLETED)
+	Status          string `json:"status"`         // INITED | PENDING_APPROVAL | REJECTING | REJECTED | PROCESSING | COMPLETED | CLOSED | CANCELED (PAID = compat alias for COMPLETED)
+	PaymentStatus   string `json:"payment_status"` // UNPAID | PARTIAL | PAID | OVERPAID — authoritative fulfillment signal (2026-05-04 doc)
+	RefundStatus    string `json:"refund_status"`  // NONE | PARTIAL | FULL
+	Description     string `json:"description"`
 	ReceivedAmount  string `json:"received_amount"`
 	CancelReason    string `json:"cancel_reason"` // set only on CANCELED orders
 	CheckoutURL     string `json:"checkout_url"`
-	PaidAt          string `json:"paid_at"`
-	CreatedAt       string `json:"created_at"`
-	ExpiresAt       string `json:"expires_at"`
+	// KYC snapshot: NONE means this order needs no KYC (uid already verified);
+	// INIT/PENDING/APPROVED/REJECTED/EXPIRED track the payer verification flow.
+	KycStatus            string `json:"kyc_status"`
+	CustomerKycFirstName string `json:"customer_kyc_first_name"` // only after KYC approval
+	CustomerKycLastName  string `json:"customer_kyc_last_name"`  // only after KYC approval
+	PaidAt               string `json:"paid_at"`
+	CreatedAt            string `json:"created_at"`
+	ExpiresAt            string `json:"expires_at"`
 }
 
 // CreateOrder creates a payment order. idempotencyKey is required by UPay.
