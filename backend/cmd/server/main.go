@@ -93,6 +93,7 @@ func main() {
 	api.POST("/webhooks/sudy", h.LogOnlyWebhook(cfg.SudyWebhookSecrets(), "sudy"))       // public; authenticated via HMAC signature
 	api.POST("/webhooks/shirly", h.LogOnlyWebhook(cfg.ShirlyWebhookSecrets(), "shirly")) // public; authenticated via HMAC signature
 	api.POST("/webhooks/tia", h.LogOnlyWebhook(cfg.TiaWebhookSecrets(), "tia"))          // public; authenticated via HMAC signature
+	api.POST("/webhooks/cassiel", h.LogOnlyWebhook(cfg.CassielWebhookSecrets(), "cassiel")) // public; authenticated via HMAC signature
 	api.POST("/webhooks/mch_test_merchant", h.ProdWebhook(                               // production; sig-first + dedup
 		cfg.TestMerchantWebhookSecrets(), r.ExistsWebhookTestMerchant, r.InsertWebhookTestMerchant,
 	))

@@ -27,6 +27,7 @@ type Config struct {
 	SudyWebhookKeys         string
 	ShirlyWebhookKeys       string
 	TiaWebhookKeys          string
+	CassielWebhookKeys      string
 	TestMerchantWebhookKeys string
 	ProdDummy1WebhookKeys   string
 
@@ -74,6 +75,11 @@ func (c Config) TiaWebhookSecrets() []string {
 	return splitSecrets(c.TiaWebhookKeys)
 }
 
+// CassielWebhookSecrets returns the Cassiel signing secrets (new first for rotation).
+func (c Config) CassielWebhookSecrets() []string {
+	return splitSecrets(c.CassielWebhookKeys)
+}
+
 // TestMerchantWebhookSecrets returns the mch_test_merchant signing secrets (new first for rotation).
 func (c Config) TestMerchantWebhookSecrets() []string {
 	return splitSecrets(c.TestMerchantWebhookKeys)
@@ -117,6 +123,7 @@ func Load() Config {
 		SudyWebhookKeys:         env("SUDY_WEBHOOK_SECRET", ""),
 		ShirlyWebhookKeys:       env("SHIRLY_WEBHOOK_SECRET", ""),
 		TiaWebhookKeys:          env("TIA_WEBHOOK_SECRET", ""),
+		CassielWebhookKeys:      env("CASSIEL_WEBHOOK_SECRET", ""),
 		TestMerchantWebhookKeys: env("TEST_MERCHANT_WEBHOOK_SECRET", ""),
 		ProdDummy1WebhookKeys:   env("PROD_DUMMY1_WEBHOOK_SECRET", ""),
 		DolosEmail:              env("DOLOS_EMAIL", ""),

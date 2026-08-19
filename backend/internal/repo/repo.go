@@ -361,7 +361,7 @@ func (r *Repo) ListPendingOrders(ctx context.Context) ([]Order, error) {
 // SaveRawWebhook persists raw request headers and body before any processing.
 // source identifies the originating merchant ("upay", "yoki", "sudy", "shirly", …).
 // Returns the generated log id, which should be threaded into InsertWebhookEvent.
-func (r *Repo) SaveRawWebhook(ctx context.Context, headers, rawBody []byte, source string) (int64, error) {
+func (r *Repo) SaveRawWebhook(ctx context.Context, headers []byte, rawBody string, source string) (int64, error) {
 	var id int64
 	err := r.pool.QueryRow(ctx,
 		`INSERT INTO webhook_raw_log(req_headers, raw_body, source) VALUES($1, $2, $3) RETURNING id`,

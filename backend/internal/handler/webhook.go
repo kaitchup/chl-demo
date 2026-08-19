@@ -15,10 +15,13 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// LogOnlyWebhook returns a handler that logs every inbound UPay event for the
-// given merchant secrets without triggering any business logic. The secrets
-// slice and source name are injected at route-registration time so the same
-// handler covers any number of merchants without code duplication.
+// LogOnlyWebhook returns a handler that records every inbound UPay event for the
+// given merchant secrets WITHOUT triggering business logic (no membership
+// activation — that is UPay main-merchant only). It persists the raw request
+// (webhook_raw_log) and, on a valid signed + parseable event, also records it in
+// webhook_events (deduped on event.id). The secrets slice and source name are
+// injected at route-registration time so the same handler covers any number of
+// merchants without code duplication.
 func (h *Handler) LogOnlyWebhook(secrets []string, source string) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		raw, err := io.ReadAll(c.Request().Body)
@@ -29,7 +32,7 @@ func (h *Handler) LogOnlyWebhook(secrets []string, source string) echo.HandlerFu
 		ctx := c.Request().Context()
 
 		hdrJSON, _ := json.Marshal(c.Request().Header)
-		logID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, raw, source)
+		logID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, string(raw), source)
 		if err != nil {
 			return c.NoContent(http.StatusInternalServerError)
 		}
@@ -50,6 +53,17 @@ func (h *Handler) LogOnlyWebhook(secrets []string, source string) echo.HandlerFu
 			return finalize(http.StatusBadRequest, "", "parse_error")
 		}
 
+		// Record the event. Delivery is at-least-once, so dedupe on event.id.
+		// No activation is performed for these merchants — recording only.
+		inserted, err := h.repo.InsertWebhookEvent(ctx, evt.ID, evt.Data.ID, evt.Event, raw, logID, source)
+		if err != nil {
+			return finalize(http.StatusInternalServerError, evt.Event, "db_error")
+		}
+		if !inserted {
+			return finalize(http.StatusOK, evt.Event, "duplicate")
+		}
+
+		_ = h.repo.MarkWebhookProcessed(ctx, evt.ID)
 		return finalize(http.StatusOK, evt.Event, "ok")
 	}
 }
@@ -68,7 +82,7 @@ func (h *Handler) UpayWebhook(c echo.Context) error {
 	// 0) Persist raw headers + body immediately, before any validation that
 	//    might short-circuit the handler (bad sig, parse error, etc.).
 	hdrJSON, _ := json.Marshal(c.Request().Header)
-	rawLogID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, raw, "upay")
+	rawLogID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, string(raw), "upay")
 	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
