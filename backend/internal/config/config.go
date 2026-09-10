@@ -30,6 +30,7 @@ type Config struct {
 	CassielWebhookKeys      string
 	TestMerchantWebhookKeys string
 	ProdDummy1WebhookKeys   string
+	DevTest001WebhookKeys   string
 
 	// Sandbox / simulate-settlement module (Dolos admin account).
 	// When DolosEmail is empty the sandbox endpoints return 503.
@@ -90,6 +91,11 @@ func (c Config) ProdDummy1WebhookSecrets() []string {
 	return splitSecrets(c.ProdDummy1WebhookKeys)
 }
 
+// DevTest001WebhookSecrets returns the mch_dev_test_001 signing secrets (new first for rotation).
+func (c Config) DevTest001WebhookSecrets() []string {
+	return splitSecrets(c.DevTest001WebhookKeys)
+}
+
 func splitSecrets(raw string) []string {
 	var out []string
 	for _, s := range strings.Split(raw, ",") {
@@ -126,6 +132,7 @@ func Load() Config {
 		CassielWebhookKeys:      env("CASSIEL_WEBHOOK_SECRET", ""),
 		TestMerchantWebhookKeys: env("TEST_MERCHANT_WEBHOOK_SECRET", ""),
 		ProdDummy1WebhookKeys:   env("PROD_DUMMY1_WEBHOOK_SECRET", ""),
+		DevTest001WebhookKeys:   env("DEV_TEST_001_WEBHOOK_SECRET", ""),
 		DolosEmail:              env("DOLOS_EMAIL", ""),
 		DolosPassword:           env("DOLOS_PASSWORD", ""),
 		AdminBaseURL:            env("ADMIN_BASE_URL", ""),

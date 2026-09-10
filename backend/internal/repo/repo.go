@@ -648,6 +648,29 @@ func (r *Repo) InsertWebhookProdDummy(ctx context.Context, eventID, headers, bod
 	return err
 }
 
+// ExistsWebhookDevTest001 checks whether an event_id has already been persisted
+// for mch_dev_test_001 (application-layer dedup).
+func (r *Repo) ExistsWebhookDevTest001(ctx context.Context, eventID string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM webhook_dev_test_001 WHERE event_id=$1)`,
+		eventID).Scan(&exists)
+	return exists, err
+}
+
+// InsertWebhookDevTest001 persists a validated, non-duplicate event for
+// mch_dev_test_001. Returns ErrConflict on unique violation (race-condition dedup).
+func (r *Repo) InsertWebhookDevTest001(ctx context.Context, eventID, headers, body, eventType string) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO webhook_dev_test_001(event_id, req_headers, raw_body, event_type)
+		 VALUES($1,$2,$3,$4)`,
+		eventID, headers, body, eventType)
+	if isUnique(err) {
+		return ErrConflict
+	}
+	return err
+}
+
 // MarkRefundFailed updates a refund to FAILED.
 func (r *Repo) MarkRefundFailed(ctx context.Context, upayRefundID string) error {
 	_, err := r.pool.Exec(ctx,

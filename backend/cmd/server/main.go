@@ -100,6 +100,9 @@ func main() {
 	api.POST("/webhooks/prod_dummy1", h.ProdWebhook( // production; sig-first + dedup
 		cfg.ProdDummy1WebhookSecrets(), r.ExistsWebhookProdDummy, r.InsertWebhookProdDummy,
 	))
+	api.POST("/webhooks/mch_dev_test_001", h.ProdWebhook( // production; sig-first + dedup
+		cfg.DevTest001WebhookSecrets(), r.ExistsWebhookDevTest001, r.InsertWebhookDevTest001,
+	))
 
 	auth := api.Group("", middleware.JWT(cfg.JWTSecret))
 	auth.GET("/me", h.Me)
