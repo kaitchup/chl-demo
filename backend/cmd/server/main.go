@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"log"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"chldemo/internal/repo"
 	"chldemo/internal/service"
 	"chldemo/internal/upay"
+	"chldemo/internal/upayopen"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
@@ -62,6 +64,19 @@ func main() {
 
 	h := handler.New(cfg, r, upayClient, payment)
 
+	// UPay OpenAPI payout webhook: optional; without keys the endpoint answers 503.
+	var payoutKey *rsa.PrivateKey
+	if cfg.UpaMerchantPrivateKey != "" {
+		if payoutKey, err = upayopen.ParsePrivateKey(cfg.UpaMerchantPrivateKey); err != nil {
+			log.Printf("UPA_MERCHANT_PRIVATE_KEY invalid, payout webhook disabled: %v", err)
+		}
+	}
+	if payoutKey != nil && cfg.UpaSecretKey != "" {
+		log.Println("payout webhook enabled")
+	} else {
+		log.Println("payout webhook NOT configured — UPA_SECRET_KEY/UPA_MERCHANT_PRIVATE_KEY not set")
+	}
+
 	// Sandbox module: optional, requires Dolos credentials.
 	var sandboxHandler *handler.SandboxHandler
 	if cfg.SandboxEnabled() {
@@ -103,6 +118,7 @@ func main() {
 	api.POST("/webhooks/mch_dev_test_001", h.ProdWebhook( // production; sig-first + dedup
 		cfg.DevTest001WebhookSecrets(), r.ExistsWebhookDevTest001, r.InsertWebhookDevTest001,
 	))
+	api.POST("/webhooks/upay-payout", h.PayoutWebhook(cfg.UpaSecretKey, payoutKey)) // public; JWE + X-UPA-SIGN
 
 	auth := api.Group("", middleware.JWT(cfg.JWTSecret))
 	auth.GET("/me", h.Me)

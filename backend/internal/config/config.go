@@ -32,6 +32,11 @@ type Config struct {
 	ProdDummy1WebhookKeys   string
 	DevTest001WebhookKeys   string
 
+	// UPay OpenAPI (payout). SecretKey signs requests and verifies webhooks; the
+	// merchant private key (PKCS#8, bare base64 or PEM) decrypts JWE payloads.
+	UpaSecretKey          string
+	UpaMerchantPrivateKey string
+
 	// Sandbox / simulate-settlement module (Dolos admin account).
 	// When DolosEmail is empty the sandbox endpoints return 503.
 	DolosEmail           string
@@ -133,6 +138,8 @@ func Load() Config {
 		TestMerchantWebhookKeys: env("TEST_MERCHANT_WEBHOOK_SECRET", ""),
 		ProdDummy1WebhookKeys:   env("PROD_DUMMY1_WEBHOOK_SECRET", ""),
 		DevTest001WebhookKeys:   env("DEV_TEST_001_WEBHOOK_SECRET", ""),
+		UpaSecretKey:            env("UPA_SECRET_KEY", ""),
+		UpaMerchantPrivateKey:   env("UPA_MERCHANT_PRIVATE_KEY", ""),
 		DolosEmail:              env("DOLOS_EMAIL", ""),
 		DolosPassword:           env("DOLOS_PASSWORD", ""),
 		AdminBaseURL:            env("ADMIN_BASE_URL", ""),
