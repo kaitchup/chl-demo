@@ -92,7 +92,8 @@ export const apiClient = {
     api.post("/auth/register", { email, password }).then((r) => unwrap<{ token: string }>(r.data)),
   login: (email: string, password: string) =>
     api.post("/auth/login", { email, password }).then((r) => unwrap<{ token: string }>(r.data)),
-  me: () => api.get("/me").then((r) => unwrap<{ email: string; member: Member }>(r.data)),
+  me: () =>
+    api.get("/me").then((r) => unwrap<{ email: string; member: Member; payout_enabled?: boolean }>(r.data)),
   plans: () => api.get("/plans").then((r) => unwrap<Plan[]>(r.data)),
   subscription: () => api.get("/subscription").then((r) => unwrap<Member>(r.data)),
   createOrder: (plan_code: string, send_uid = true) =>

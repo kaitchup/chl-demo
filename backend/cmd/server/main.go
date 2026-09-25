@@ -77,6 +77,27 @@ func main() {
 		log.Println("payout webhook NOT configured — UPA_SECRET_KEY/UPA_MERCHANT_PRIVATE_KEY not set")
 	}
 
+	// Payout module: needs the full UPA_* set; otherwise /api/payout is not registered.
+	var payoutSvc *service.PayoutService
+	if cfg.PayoutEnabled() {
+		pc, err := upayopen.New(cfg.UpaHost, cfg.UpaAPIKey, cfg.UpaSecretKey, cfg.UpaPlatformPublicKey, cfg.UpaMerchantPrivateKey)
+		if err != nil {
+			log.Fatalf("upayopen client: %v", err)
+		}
+		payoutSvc = service.NewPayout(pc, r, service.PayoutConfig{
+			DebitSymbol: cfg.PayoutDebitSymbol, UploadFileType: cfg.PayoutUploadFileType,
+		})
+		go job.NewPayoutSync(r, payoutSvc, cfg.PayoutSyncInterval).Run(ctx)
+		go func() { // area/list can take ~10s; warm the cache before the first KYC page
+			if _, err := payoutSvc.Countries(ctx); err != nil {
+				log.Printf("payout: warm country list: %v", err)
+			}
+		}()
+		log.Printf("payout enabled (host=%s debit=%s fileType=%d)", cfg.UpaHost, cfg.PayoutDebitSymbol, cfg.PayoutUploadFileType)
+	} else {
+		log.Println("payout NOT configured — UPA_HOST/UPA_API_KEY/UPA_PLATFORM_PUBLIC_KEY not set")
+	}
+
 	// Sandbox module: optional, requires Dolos credentials.
 	var sandboxHandler *handler.SandboxHandler
 	if cfg.SandboxEnabled() {
@@ -118,7 +139,7 @@ func main() {
 	api.POST("/webhooks/mch_dev_test_001", h.ProdWebhook( // production; sig-first + dedup
 		cfg.DevTest001WebhookSecrets(), r.ExistsWebhookDevTest001, r.InsertWebhookDevTest001,
 	))
-	api.POST("/webhooks/upay-payout", h.PayoutWebhook(cfg.UpaSecretKey, payoutKey)) // public; JWE + X-UPA-SIGN
+	api.POST("/webhooks/upay-payout", h.PayoutWebhook(cfg.UpaSecretKey, payoutKey, payoutSvc)) // public; JWE + X-UPA-SIGN
 
 	auth := api.Group("", middleware.JWT(cfg.JWTSecret))
 	auth.GET("/me", h.Me)
@@ -130,6 +151,28 @@ func main() {
 	auth.GET("/orders/:id/refunds", h.ListOrderRefunds)
 	auth.GET("/refunds/:id", h.GetRefund)
 	auth.POST("/refunds/:id/sync", h.SyncRefund)
+
+	// Payout (汇款) — JWT + users.payout_enabled whitelist.
+	if payoutSvc != nil {
+		ph := handler.NewPayoutHandler(payoutSvc, r)
+		po := auth.Group("/payout", middleware.PayoutEnabled(r.IsPayoutEnabled))
+		po.GET("/bootstrap", ph.Bootstrap)
+		po.GET("/options", ph.Options)
+		po.POST("/files", ph.Upload)
+		po.GET("/payer", ph.GetPayer)
+		po.POST("/payer", ph.CreatePayer)
+		po.GET("/recipients", ph.ListRecipients)
+		po.POST("/recipients", ph.CreateRecipient)
+		po.POST("/recipients/:id/retry", ph.RetryRecipient)
+		po.POST("/trade-password", ph.SetTradePassword)
+		po.POST("/orders", ph.CreateOrder)
+		po.GET("/orders", ph.ListOrders)
+		po.GET("/orders/:id", ph.GetOrder)
+		po.GET("/orders/:id/quote", ph.Quote)
+		po.POST("/orders/:id/confirm", ph.Confirm)
+		po.POST("/orders/:id/cancel", ph.Cancel)
+		po.POST("/orders/:id/requote", ph.Requote)
+	}
 
 	// Sandbox routes — /login is public; simulation routes require X-Merchant-Token session key.
 	// Returns 503 when sandbox is not configured.

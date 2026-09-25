@@ -533,7 +533,7 @@ Content-Type: text/plain;  连接 / 读超时各 5s;  成功判定: HTTP 200 且
 - [ ] 汇款记录列表；导航入口
 
 ### 联调 / 上线
-- [ ] 回调地址提交 UPay 验证
+- [x] 回调地址提交 UPay 验证（2026-09-25 通过；最小版端点已上线，线上冒烟：正确签名 → SUCCESS，错误签名 → 401）
 - [ ] 测试环境真实确认一笔 20 USD，观察回调 → 固化验签口径（改 §6.4）
 - [ ] UPay 后台配置 IP 白名单
 - [ ] `UPDATE users SET payout_enabled = true WHERE email = …`

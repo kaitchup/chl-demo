@@ -20,7 +20,8 @@
 - [ ] **汇款（Payout）功能**（设计定稿，可开工）
   - 需求 / 决策：[PRD-汇款功能-可行性分析.md](PRD-汇款功能-可行性分析.md)；技术设计 + 施工清单：[TECH-DESIGN-汇款功能.md](TECH-DESIGN-汇款功能.md) §13
   - [x] 拿到测试环境凭据 + Payout 权限；签名 / JWE / 表单 / 下单报价已实测（TECH §0）
-  - [ ] 回调地址提交 UPay 验证；配 IP 白名单
+  - [x] 回调端点（最小版）上线并通过 UPay 验证：`/api/webhooks/upay-payout`（2026-09-25）
+  - [ ] UPay 后台配置 IP 白名单
   - [ ] 向 UPay 反馈：fileType=10 上传报错、IBAN 必填、币种选项为空（TECH §12）
 
 ## 沙盒 / 开发体验

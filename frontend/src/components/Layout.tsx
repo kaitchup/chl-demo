@@ -1,10 +1,14 @@
 import { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
+import { apiClient } from "../api/client";
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { token, logout } = useAuth();
   const nav = useNavigate();
+  // The payout entry is shown only to whitelisted users (users.payout_enabled).
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: apiClient.me, enabled: !!token });
 
   return (
     <div className="min-h-screen">
@@ -25,6 +29,11 @@ export default function Layout({ children }: { children: ReactNode }) {
                 <Link to="/account/orders" className="hover:text-indigo-600">
                   订单
                 </Link>
+                {me?.payout_enabled && (
+                  <Link to="/payout" className="hover:text-indigo-600">
+                    汇款
+                  </Link>
+                )}
                 <button
                   onClick={() => {
                     logout();

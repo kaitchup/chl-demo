@@ -36,6 +36,12 @@ type Config struct {
 	// merchant private key (PKCS#8, bare base64 or PEM) decrypts JWE payloads.
 	UpaSecretKey          string
 	UpaMerchantPrivateKey string
+	UpaHost               string
+	UpaAPIKey             string
+	UpaPlatformPublicKey  string
+	PayoutDebitSymbol     string        // default USDT
+	PayoutUploadFileType  int           // default 10 (payout material)
+	PayoutSyncInterval    time.Duration // default 60s
 
 	// Sandbox / simulate-settlement module (Dolos admin account).
 	// When DolosEmail is empty the sandbox endpoints return 503.
@@ -49,6 +55,12 @@ type Config struct {
 // SandboxEnabled reports whether the sandbox simulate module is configured.
 func (c Config) SandboxEnabled() bool {
 	return c.DolosEmail != "" && c.AdminBaseURL != ""
+}
+
+// PayoutEnabled reports whether the UPay OpenAPI payout module is configured.
+func (c Config) PayoutEnabled() bool {
+	return c.UpaHost != "" && c.UpaAPIKey != "" && c.UpaSecretKey != "" &&
+		c.UpaPlatformPublicKey != "" && c.UpaMerchantPrivateKey != ""
 }
 
 // UpayEnabled reports whether real UPay integration is configured.
@@ -120,6 +132,10 @@ func Load() Config {
 	if err != nil {
 		reconcile = 60 * time.Second
 	}
+	payoutSync, err := time.ParseDuration(env("PAYOUT_SYNC_INTERVAL", "60s"))
+	if err != nil {
+		payoutSync = 60 * time.Second
+	}
 	return Config{
 		DatabaseURL:             env("DATABASE_URL", "postgres://chl:chl@localhost:5432/chl?sslmode=disable"),
 		JWTSecret:               env("JWT_SECRET", "dev-secret-change-me"),
@@ -140,6 +156,12 @@ func Load() Config {
 		DevTest001WebhookKeys:   env("DEV_TEST_001_WEBHOOK_SECRET", ""),
 		UpaSecretKey:            env("UPA_SECRET_KEY", ""),
 		UpaMerchantPrivateKey:   env("UPA_MERCHANT_PRIVATE_KEY", ""),
+		UpaHost:                 env("UPA_HOST", ""),
+		UpaAPIKey:               env("UPA_API_KEY", ""),
+		UpaPlatformPublicKey:    env("UPA_PLATFORM_PUBLIC_KEY", ""),
+		PayoutDebitSymbol:       env("PAYOUT_DEBIT_SYMBOL", "USDT"),
+		PayoutUploadFileType:    envInt("PAYOUT_UPLOAD_FILE_TYPE", 10),
+		PayoutSyncInterval:      payoutSync,
 		DolosEmail:              env("DOLOS_EMAIL", ""),
 		DolosPassword:           env("DOLOS_PASSWORD", ""),
 		AdminBaseURL:            env("ADMIN_BASE_URL", ""),

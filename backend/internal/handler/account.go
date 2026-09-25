@@ -43,10 +43,15 @@ func (h *Handler) Me(c echo.Context) error {
 		return fail(c, http.StatusUnauthorized, "unauthorized", "user not found")
 	}
 	sub, found, _ := h.repo.GetSubscription(c.Request().Context(), uid)
+	payoutEnabled := false
+	if h.cfg.PayoutEnabled() {
+		payoutEnabled, _ = h.repo.IsPayoutEnabled(c.Request().Context(), uid)
+	}
 	return ok(c, map[string]any{
-		"email":      u.Email,
-		"created_at": u.CreatedAt,
-		"member":     memberView(sub, found),
+		"email":          u.Email,
+		"created_at":     u.CreatedAt,
+		"member":         memberView(sub, found),
+		"payout_enabled": payoutEnabled,
 	})
 }
 

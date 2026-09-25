@@ -13,6 +13,7 @@ import SandboxLogin from "./pages/sandbox/SandboxLogin";
 import SimulationList from "./pages/sandbox/SimulationList";
 import SimulationNew from "./pages/sandbox/SimulationNew";
 import SimulationDetail from "./pages/sandbox/SimulationDetail";
+import PayoutRoutes from "./pages/payout";
 
 export default function App() {
   return (
@@ -20,6 +21,9 @@ export default function App() {
       {/* Sandbox — no consumer Layout */}
       <Route path="/sandbox/login" element={<SandboxLogin />} />
       <Route path="/sandbox/*" element={<SandboxRoutes />} />
+
+      {/* Payout (汇款) — mobile-first, no desktop Layout */}
+      <Route path="/payout/*" element={<RequireAuth><PayoutRoutes /></RequireAuth>} />
 
       {/* Consumer app — wrapped in Layout */}
       <Route path="*" element={<ConsumerRoutes />} />

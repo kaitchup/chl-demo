@@ -18,6 +18,7 @@
 | [docs/TECH-DESIGN-技术方案.md](docs/TECH-DESIGN-技术方案.md) | 技术方案（数据模型、API、UPay 集成、回调验签、轮询兜底） |
 | [docs/PRD-汇款功能-可行性分析.md](docs/PRD-汇款功能-可行性分析.md) | 汇款（Payout）可行性分析：决策、UI↔接口对照、物料清单、分期 |
 | [docs/TECH-DESIGN-汇款功能.md](docs/TECH-DESIGN-汇款功能.md) | 汇款（Payout）技术设计：实测结论、upayopen 客户端、表结构、API 契约、前端页面、施工清单 |
+| [docs/HANDOFF-汇款功能实现.md](docs/HANDOFF-汇款功能实现.md) | 汇款功能实现交接（STAR）：已做/已验证/未验证/接手步骤 |
 | [docs/UPAY-汇款接口问题清单.md](docs/UPAY-汇款接口问题清单.md) | 向 UPay 确认的汇款接口问题（附请求/响应原文 + 结论栏） |
 | [docs/TODO.md](docs/TODO.md) | 待办 / Roadmap（v0.0.2 真实支付、VDS 部署、域名+HTTPS、Cloudflare） |
 | [docs/TEST-ACCOUNTS.md](docs/TEST-ACCOUNTS.md) | 本地测试账号（含明文口令，**已 gitignore**） |
