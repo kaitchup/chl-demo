@@ -17,6 +17,12 @@
   - 依赖：UPay 测试环境仅经 NetBird VPN 可达；CA 在 [`certs/upay-local-ca.crt`](../certs/upay-local-ca.crt)
   - 设计细节见 [TECH-DESIGN-技术方案.md](TECH-DESIGN-技术方案.md) §6 / §9
 
+- [ ] **汇款（Payout）功能**（设计定稿，可开工）
+  - 需求 / 决策：[PRD-汇款功能-可行性分析.md](PRD-汇款功能-可行性分析.md)；技术设计 + 施工清单：[TECH-DESIGN-汇款功能.md](TECH-DESIGN-汇款功能.md) §13
+  - [x] 拿到测试环境凭据 + Payout 权限；签名 / JWE / 表单 / 下单报价已实测（TECH §0）
+  - [ ] 回调地址提交 UPay 验证；配 IP 白名单
+  - [ ] 向 UPay 反馈：fileType=10 上传报错、IBAN 必填、币种选项为空（TECH §12）
+
 ## 沙盒 / 开发体验
 
 - [ ] **去掉模拟到账表单中的 `payment_request_id` 手填项**

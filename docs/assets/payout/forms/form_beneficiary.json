@@ -1,0 +1,158 @@
+{
+    "success": true,
+    "ts": 1790317369,
+    "data": {
+        "forms": [
+            {
+                "code": "person",
+                "name": "Person",
+                "group": [
+                    {
+                        "code": "base",
+                        "name": "Basic Information",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Complete Name",
+                                "optionKey": null,
+                                "fieldKey": "name",
+                                "isEdit": false,
+                                "format": null,
+                                "description": "Maximum 140 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Date of Birth",
+                                "optionKey": null,
+                                "fieldKey": "dateOfBirth",
+                                "isEdit": true,
+                                "format": "yyyy-MM-dd",
+                                "description": "Unix timestamp in milliseconds (ms)",
+                                "fieldType": "date",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Nationality",
+                                "optionKey": null,
+                                "fieldKey": "nationality",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "ISO 3166-1 alpha-2 country code (two letters)",
+                                "fieldType": "select",
+                                "required": true
+                            }
+                        ]
+                    },
+                    {
+                        "code": "contact",
+                        "name": "Contact Information",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Email",
+                                "optionKey": null,
+                                "fieldKey": "email",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Must be a valid email address. Maximum 64 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Calling Code",
+                                "optionKey": null,
+                                "fieldKey": "callingCode",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "International calling code, including the plus sign (e.g. +1, +86).",
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Phone Number",
+                                "optionKey": null,
+                                "fieldKey": "number",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Can only contain digits and hyphens, and must start and end with a digit",
+                                "fieldType": "input",
+                                "required": true
+                            }
+                        ]
+                    },
+                    {
+                        "code": "residentialAddress",
+                        "name": "Residential Address",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Residential Country/Region",
+                                "optionKey": null,
+                                "fieldKey": "country",
+                                "isEdit": false,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "State / Province",
+                                "optionKey": null,
+                                "fieldKey": "state",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "City",
+                                "optionKey": null,
+                                "fieldKey": "city",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Address Line 1",
+                                "optionKey": null,
+                                "fieldKey": "line1",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 200 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Address Line 2",
+                                "optionKey": null,
+                                "fieldKey": "line2",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 200 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Postal Code",
+                                "optionKey": null,
+                                "fieldKey": "postalCode",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Letters, digits, spaces, and hyphens only. Maximum 20 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "options": {}
+    },
+    "code": 0,
+    "msg": "Success"
+}

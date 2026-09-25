@@ -1,0 +1,194 @@
+{
+    "success": true,
+    "ts": 1790317370,
+    "data": {
+        "forms": [
+            {
+                "code": "bankAccount",
+                "name": "Bank Account",
+                "group": [
+                    {
+                        "code": "bankClearingCode",
+                        "name": "Bank Clearing Code",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Code Type",
+                                "optionKey": "bank.bankAccount.bankClearingCode.type",
+                                "fieldKey": "type",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Code Value",
+                                "optionKey": null,
+                                "fieldKey": "value",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "must be 8-15 characters, letters or digits only",
+                                "fieldType": "input",
+                                "required": true
+                            }
+                        ]
+                    },
+                    {
+                        "code": "default",
+                        "name": "",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Bank Country/Region",
+                                "optionKey": null,
+                                "fieldKey": "country",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "ISO 3166-1 alpha-2 country code (two letters)",
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Account Currency",
+                                "optionKey": "bank.bankAccount.default.currency",
+                                "fieldKey": "currency",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Account Holder Name",
+                                "optionKey": null,
+                                "fieldKey": "holder",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 140 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Bank Name",
+                                "optionKey": null,
+                                "fieldKey": "bank",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 140 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Transfer Type",
+                                "optionKey": "bank.bankAccount.default.transferType",
+                                "fieldKey": "transferType",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Bank account number",
+                                "optionKey": null,
+                                "fieldKey": "accountNumber",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Letters and digits only. Maximum 34 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "IBAN",
+                                "optionKey": null,
+                                "fieldKey": "iban",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Must be between 15~34 characters and start with 2 letters, 2 digits, followed by alphanumeric characters",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Holder Country/Region",
+                                "optionKey": null,
+                                "fieldKey": "holderAddressCountry",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "ISO 3166-1 alpha-2 country code (two letters)",
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Holder State / Province",
+                                "optionKey": null,
+                                "fieldKey": "holderAddressState",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Holder City",
+                                "optionKey": null,
+                                "fieldKey": "holderAddressCity",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Holder Address Line 1",
+                                "optionKey": null,
+                                "fieldKey": "holderAddressLine1",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 200 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Holder Address Line 2",
+                                "optionKey": null,
+                                "fieldKey": "holderAddressLine2",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 200 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Holder Postal Code",
+                                "optionKey": null,
+                                "fieldKey": "holderAddressPostalCode",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Letters, digits, spaces, and hyphens only. Maximum 20 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "options": {
+            "bank.bankAccount.default.transferType": [
+                {
+                    "label": "SWIFT",
+                    "value": "swift"
+                }
+            ],
+            "bank.bankAccount.bankClearingCode.type": [
+                {
+                    "label": "SWIFT",
+                    "value": "swift_code"
+                }
+            ]
+        }
+    },
+    "code": 0,
+    "msg": "Success"
+}

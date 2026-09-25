@@ -1,0 +1,785 @@
+{
+    "success": true,
+    "ts": 1790317368,
+    "data": {
+        "forms": [
+            {
+                "code": "person",
+                "name": "Person",
+                "group": [
+                    {
+                        "code": "base",
+                        "name": "Basic Information",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Complete Name",
+                                "optionKey": null,
+                                "fieldKey": "name",
+                                "isEdit": false,
+                                "format": null,
+                                "description": "Maximum 140 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Local Language Name",
+                                "optionKey": null,
+                                "fieldKey": "nameLocal",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 140 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Date of Birth",
+                                "optionKey": null,
+                                "fieldKey": "dateOfBirth",
+                                "isEdit": true,
+                                "format": "yyyy-MM-dd",
+                                "description": "Unix timestamp in milliseconds (ms)",
+                                "fieldType": "date",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Nationality",
+                                "optionKey": null,
+                                "fieldKey": "nationality",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "ISO 3166-1 alpha-2 country code (two letters)",
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Gender",
+                                "optionKey": "payer.person.base.gender",
+                                "fieldKey": "gender",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "radio",
+                                "required": true
+                            }
+                        ]
+                    },
+                    {
+                        "code": "contact",
+                        "name": "Contact Information",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Email",
+                                "optionKey": null,
+                                "fieldKey": "email",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Must be a valid email address. Maximum 64 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Calling Code",
+                                "optionKey": null,
+                                "fieldKey": "callingCode",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "International calling code, including the plus sign (e.g. +1, +86).",
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Phone Number",
+                                "optionKey": null,
+                                "fieldKey": "phoneNumber",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Can only contain digits and hyphens, and must start and end with a digit",
+                                "fieldType": "input",
+                                "required": true
+                            }
+                        ]
+                    },
+                    {
+                        "code": "document",
+                        "name": "Document Information",
+                        "isMultiple": true,
+                        "fields": [
+                            {
+                                "fieldName": "ID Type",
+                                "optionKey": "payer.person.document.type",
+                                "fieldKey": "type",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "ID Number",
+                                "optionKey": null,
+                                "fieldKey": "number",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Issuing Country",
+                                "optionKey": null,
+                                "fieldKey": "issuingCountry",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "ISO 3166-1 alpha-2 country code (two letters)",
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Issuing State/Province",
+                                "optionKey": null,
+                                "fieldKey": "issuingState",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Issue Date",
+                                "optionKey": null,
+                                "fieldKey": "issuedDate",
+                                "isEdit": true,
+                                "format": "yyyy-MM-dd",
+                                "description": "Unix timestamp in milliseconds (ms)",
+                                "fieldType": "date",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Country of Citizenship",
+                                "optionKey": null,
+                                "fieldKey": "citizenship",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "ISO 3166-1 alpha-2 country code (two letters)",
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Primary ID",
+                                "optionKey": "payer.person.document.primary",
+                                "fieldKey": "primary",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "ID Validity",
+                                "optionKey": "payer.person.document.expiryType",
+                                "fieldKey": "expiryType",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Expiry Date",
+                                "optionKey": null,
+                                "fieldKey": "expiryDate",
+                                "isEdit": true,
+                                "format": "yyyy-MM-dd",
+                                "description": "Unix timestamp in milliseconds (ms)",
+                                "fieldType": "date",
+                                "required": false
+                            }
+                        ]
+                    },
+                    {
+                        "code": "residentialAddress",
+                        "name": "Residential Address",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Residential Country/Region",
+                                "optionKey": null,
+                                "fieldKey": "country",
+                                "isEdit": false,
+                                "format": null,
+                                "description": "ISO 3166-1 alpha-2 country code (two letters)",
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "State / Province",
+                                "optionKey": null,
+                                "fieldKey": "province",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "City",
+                                "optionKey": null,
+                                "fieldKey": "city",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Address Line 1",
+                                "optionKey": null,
+                                "fieldKey": "line1",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Address Line 2",
+                                "optionKey": null,
+                                "fieldKey": "line2",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Postal Code",
+                                "optionKey": null,
+                                "fieldKey": "postalCode",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Letters, digits, spaces, and hyphens only. Maximum 20 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "File name",
+                                "optionKey": null,
+                                "fieldKey": "fileName",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Describe",
+                                "optionKey": null,
+                                "fieldKey": "describe",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "textarea",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Proof image",
+                                "optionKey": null,
+                                "fieldKey": "proofImage",
+                                "isEdit": true,
+                                "format": "jpg,png,jpeg",
+                                "description": " Upload files via the /v1/common/file/upload endpoint, fileType=10. Supported formats: jpg, png, jpeg.",
+                                "fieldType": "upload",
+                                "required": true
+                            }
+                        ]
+                    },
+                    {
+                        "code": "identification",
+                        "name": "Identification documents",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Materia type",
+                                "optionKey": "payer.person.identification.materiaType",
+                                "fieldKey": "materiaType",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "File name",
+                                "optionKey": null,
+                                "fieldKey": "fileName",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Materia file",
+                                "optionKey": null,
+                                "fieldKey": "materiaImage",
+                                "isEdit": true,
+                                "format": "jpg,png,jpeg,pdf",
+                                "description": "Upload files via the /v1/common/file/upload endpoint, fileType=10. Supported formats: jpg, png, jpeg.",
+                                "fieldType": "upload",
+                                "required": true
+                            },
+                            {
+                                "fieldName": "Materia describe",
+                                "optionKey": null,
+                                "fieldKey": "materiaDescribe",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "textarea",
+                                "required": true
+                            }
+                        ]
+                    },
+                    {
+                        "code": "occupationFundSource",
+                        "name": "Occupation, Income & Source of Wealth",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Employment Status",
+                                "optionKey": "payer.person.occupationFundSource.employmentStatus",
+                                "fieldKey": "employmentStatus",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Occupation",
+                                "optionKey": null,
+                                "fieldKey": "occupation",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "ISCO Code",
+                                "optionKey": null,
+                                "fieldKey": "scoCode",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Exactly 4 digits.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Industry",
+                                "optionKey": null,
+                                "fieldKey": "industry",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Work Industry Category",
+                                "optionKey": "payer.person.occupationFundSource.workIndustry",
+                                "fieldKey": "workIndustry",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Employer Name",
+                                "optionKey": null,
+                                "fieldKey": "employer",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 200 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Job Title",
+                                "optionKey": null,
+                                "fieldKey": "designation",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Main Source of Income",
+                                "optionKey": "payer.person.occupationFundSource.sourceOfIncome",
+                                "fieldKey": "sourceOfIncome",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Source of Wealth Category",
+                                "optionKey": "payer.person.occupationFundSource.wealthSourceCategory",
+                                "fieldKey": "wealthSourceCategory",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "select",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Source of Wealth Description",
+                                "optionKey": null,
+                                "fieldKey": "wealthSourceDescription",
+                                "isEdit": true,
+                                "format": null,
+                                "description": null,
+                                "fieldType": "textarea",
+                                "required": false
+                            }
+                        ]
+                    },
+                    {
+                        "code": "identityAndTax",
+                        "name": "Identity & Tax",
+                        "isMultiple": false,
+                        "fields": [
+                            {
+                                "fieldName": "Tax Residence Country",
+                                "optionKey": null,
+                                "fieldKey": "taxResidenceCountry",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "ISO 3166-1 alpha-2 country code (two letters)",
+                                "fieldType": "select",
+                                "required": false
+                            },
+                            {
+                                "fieldName": "Tax ID",
+                                "optionKey": null,
+                                "fieldKey": "taxId",
+                                "isEdit": true,
+                                "format": null,
+                                "description": "Letters and digits only. Maximum 100 characters.",
+                                "fieldType": "input",
+                                "required": false
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "options": {
+            "payer.person.document.expiryType": [
+                {
+                    "label": "dated",
+                    "value": "dated"
+                },
+                {
+                    "label": "indefinite",
+                    "value": "indefinite"
+                }
+            ],
+            "payer.person.occupationFundSource.wealthSourceCategory": [
+                {
+                    "label": "salary_savings",
+                    "value": "salary_savings"
+                },
+                {
+                    "label": "business",
+                    "value": "business"
+                },
+                {
+                    "label": "investment",
+                    "value": "investment"
+                },
+                {
+                    "label": "property",
+                    "value": "property"
+                },
+                {
+                    "label": "inheritance",
+                    "value": "inheritance"
+                },
+                {
+                    "label": "gift",
+                    "value": "gift"
+                },
+                {
+                    "label": "other",
+                    "value": "other"
+                }
+            ],
+            "payer.person.occupationFundSource.sourceOfIncome": [
+                {
+                    "label": "Salary",
+                    "value": "Salary"
+                },
+                {
+                    "label": "Pension",
+                    "value": "Pension"
+                },
+                {
+                    "label": "Investment",
+                    "value": "Investment"
+                },
+                {
+                    "label": "Property",
+                    "value": "Property"
+                },
+                {
+                    "label": "FriendsAndFamily",
+                    "value": "FriendsAndFamily"
+                },
+                {
+                    "label": "Benefits",
+                    "value": "Benefits"
+                }
+            ],
+            "payer.person.occupationFundSource.workIndustry": [
+                {
+                    "label": "BankingAndFinancialServices",
+                    "value": "BankingAndFinancialServices"
+                },
+                {
+                    "label": "InvestmentAndSecurities",
+                    "value": "InvestmentAndSecurities"
+                },
+                {
+                    "label": "Insurance",
+                    "value": "Insurance"
+                },
+                {
+                    "label": "RealEstate",
+                    "value": "RealEstate"
+                },
+                {
+                    "label": "LegalServices",
+                    "value": "LegalServices"
+                },
+                {
+                    "label": "AccountingAndAuditing",
+                    "value": "AccountingAndAuditing"
+                },
+                {
+                    "label": "GamingAndGambling",
+                    "value": "GamingAndGambling"
+                },
+                {
+                    "label": "MiningAndEnergy",
+                    "value": "MiningAndEnergy"
+                },
+                {
+                    "label": "RetailAndECommerce",
+                    "value": "RetailAndECommerce"
+                },
+                {
+                    "label": "HealthcareAndPharmaceuticals",
+                    "value": "HealthcareAndPharmaceuticals"
+                },
+                {
+                    "label": "GovernmentAndPublicSector",
+                    "value": "GovernmentAndPublicSector"
+                },
+                {
+                    "label": "NonProfitAndCharity",
+                    "value": "NonProfitAndCharity"
+                },
+                {
+                    "label": "TechnologyAndSoftwareDevelopment",
+                    "value": "TechnologyAndSoftwareDevelopment"
+                },
+                {
+                    "label": "TransportationAndLogistics",
+                    "value": "TransportationAndLogistics"
+                },
+                {
+                    "label": "HospitalityAndTourism",
+                    "value": "HospitalityAndTourism"
+                }
+            ],
+            "payer.person.document.type": [
+                {
+                    "label": "passport",
+                    "value": "passport"
+                },
+                {
+                    "label": "national_id",
+                    "value": "national_id"
+                },
+                {
+                    "label": "driving_license",
+                    "value": "driving_license"
+                },
+                {
+                    "label": "residence_permit",
+                    "value": "residence_permit"
+                },
+                {
+                    "label": "tax_id",
+                    "value": "tax_id"
+                },
+                {
+                    "label": "address_proof",
+                    "value": "address_proof"
+                },
+                {
+                    "label": "other",
+                    "value": "other"
+                },
+                {
+                    "label": "asylum_registration_card",
+                    "value": "asylum_registration_card"
+                },
+                {
+                    "label": "consular_id",
+                    "value": "consular_id"
+                },
+                {
+                    "label": "immigration_status_document",
+                    "value": "immigration_status_document"
+                },
+                {
+                    "label": "indigenous_card",
+                    "value": "indigenous_card"
+                },
+                {
+                    "label": "insurance_card",
+                    "value": "insurance_card"
+                },
+                {
+                    "label": "international_driving_license",
+                    "value": "international_driving_license"
+                },
+                {
+                    "label": "municipal_identity_card",
+                    "value": "municipal_identity_card"
+                },
+                {
+                    "label": "national_health_id",
+                    "value": "national_health_id"
+                },
+                {
+                    "label": "postal_identity_card",
+                    "value": "postal_identity_card"
+                },
+                {
+                    "label": "private_operators_card",
+                    "value": "private_operators_card"
+                },
+                {
+                    "label": "professional_qualification_card",
+                    "value": "professional_qualification_card"
+                },
+                {
+                    "label": "proof_of_citizenship",
+                    "value": "proof_of_citizenship"
+                },
+                {
+                    "label": "residence_status_document",
+                    "value": "residence_status_document"
+                },
+                {
+                    "label": "service_id_card",
+                    "value": "service_id_card"
+                },
+                {
+                    "label": "social_security_card",
+                    "value": "social_security_card"
+                },
+                {
+                    "label": "visa",
+                    "value": "visa"
+                },
+                {
+                    "label": "voter_id",
+                    "value": "voter_id"
+                },
+                {
+                    "label": "work_permit",
+                    "value": "work_permit"
+                }
+            ],
+            "payer.person.identification.materiaType": [
+                {
+                    "label": "Driver's License",
+                    "value": "drivers_license"
+                },
+                {
+                    "label": "National ID",
+                    "value": "national_id"
+                },
+                {
+                    "label": "Passport",
+                    "value": "passport"
+                },
+                {
+                    "label": "Other",
+                    "value": "other"
+                }
+            ],
+            "payer.person.document.primary": [
+                {
+                    "label": "yes",
+                    "value": "yes"
+                },
+                {
+                    "label": "no",
+                    "value": "no"
+                }
+            ],
+            "payer.person.base.gender": [
+                {
+                    "label": "Male",
+                    "value": "Male"
+                },
+                {
+                    "label": "Female",
+                    "value": "Female"
+                }
+            ],
+            "payer.person.occupationFundSource.employmentStatus": [
+                {
+                    "label": "employed",
+                    "value": "employed"
+                },
+                {
+                    "label": "self_employed",
+                    "value": "self_employed"
+                },
+                {
+                    "label": "unemployed",
+                    "value": "unemployed"
+                },
+                {
+                    "label": "student",
+                    "value": "student"
+                },
+                {
+                    "label": "retired",
+                    "value": "retired"
+                },
+                {
+                    "label": "homemaker",
+                    "value": "homemaker"
+                },
+                {
+                    "label": "other",
+                    "value": "other"
+                }
+            ]
+        }
+    },
+    "code": 0,
+    "msg": "Success"
+}
