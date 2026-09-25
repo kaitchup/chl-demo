@@ -31,7 +31,7 @@ func (h *Handler) PayoutWebhook(secret string, key *rsa.PrivateKey) echo.Handler
 		ctx := c.Request().Context()
 
 		hdrJSON, _ := json.Marshal(c.Request().Header)
-		logID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, string(raw), "upay-payout")
+		logID, err := h.repo.SaveRawWebhook(ctx, hdrJSON, string(raw), "upay-busi-payout")
 		if err != nil {
 			return c.NoContent(http.StatusInternalServerError)
 		}

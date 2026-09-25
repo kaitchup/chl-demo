@@ -299,7 +299,7 @@ POST /api/payout/orders/:id/cancel
 
 | 步骤 | 说明 |
 |---|---|
-| 1 | 读原始 body（text/plain JWE 串）+ headers → `SaveRawWebhook(source="upay-payout")` |
+| 1 | 读原始 body（text/plain JWE 串）+ headers → `SaveRawWebhook(source="upay-busi-payout")` |
 | 2 | 商户私钥解密 → `{event, trace, orderNo, timestamp, detail}` |
 | 3 | 先解密取 `event`，再验签：`Base64(HMAC-SHA256(UPA_SECRET_KEY, event+"\|"+X-UPA-TIMESTAMP+"\|"+原始 body 密文串))`，常量时间比较；失败 → 401。用报文里的 `event` 而非写死常量，这样 UPay 验证地址时推送的任何已签名事件都能回 `SUCCESS`（已实现：`handler/payout_webhook.go`） |
 | 4 | `X-UPA-TIMESTAMP` 与当前时间差 > 30 分钟 → 401（原因见下方「发送端实现」） |

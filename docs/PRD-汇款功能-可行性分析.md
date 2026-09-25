@@ -134,7 +134,7 @@
 
 **处理流程**（沿用现有 `ProdWebhook`「先验签 + 去重」的套路）：
 
-1. 读原始 body，先整体写入 `webhook_raw_log`（source=`upay-payout`），便于排障
+1. 读原始 body，先整体写入 `webhook_raw_log`（source=`upay-busi-payout`），便于排障
 2. 用商户私钥解密 → 取 `event`
 3. 验签：`Base64(HMAC-SHA256(SecretKey, event + "|" + X-UPA-TIMESTAMP + "|" + body))`，失败返回 401；时间戳超出 ±5 分钟拒绝（防重放）
 4. 按外层 `orderNo` 去重（唯一索引），重复直接回 `SUCCESS`
