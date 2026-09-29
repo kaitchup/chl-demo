@@ -1,6 +1,6 @@
 # 汇款功能实现 — 交接记录（STAR）
 
-> 2026-09-25 · 分支 `feature/payout`（基于 `main` 的 `5a935bb`）· **全部实现未提交、未在真实数据库上跑过**
+> 2026-09-25 起草，2026-09-27 更新 · 实现已由 Kaitchup 提交并推送到 `main`（`d3e51e5`，原 `feature/payout` 已删）；后续修改在 `feature/payout-followup`（未提交）· 2026-09-28 本地 API 冒烟已跑通（确认汇款除外），**前端未点测；UPay 报价缺扣款总额 / 手续费（问题清单 #6），修复前不能上线**
 > 需求：[PRD-汇款功能-可行性分析.md](PRD-汇款功能-可行性分析.md) · 设计：[TECH-DESIGN-汇款功能.md](TECH-DESIGN-汇款功能.md) · UPay 问题：[UPAY-汇款接口问题清单.md](UPAY-汇款接口问题清单.md)
 
 ## S — 背景
@@ -76,14 +76,53 @@
 
 临时实例已停止（5433 已释放）；会话临时目录里残留的 embedded-postgres 文件与探测脚本不影响仓库，可忽略。
 
+## 2026-09-27 跟进（`feature/payout-followup`，未提交）
+
+- 静态审查 `repo/payout.go` 全部 SQL：`ListPayoutOrders` 的游标参数加 `::bigint`（原写法 `$2` 会被推断为 int4）；其余无问题
+- `healthz` 增加 `payout_enabled`
+- `deploy/.env.example`：列出 5 个 `UPA_*` + 可选 `PAYOUT_*`
+- TECH-DESIGN 回写上面「差异」5 条（§6.3 重报价、§7 接口表 / 错误码、§7.1 区号），§13 施工清单打勾，新增「本地连库联调」待办
+- 本地库：WSL（`Ubuntu-26.04`）里的 PG17，经 Kaitchup 同意新建角色与库，`postgres://chl:chl@127.0.0.1:5432/chl`。Windows 上**必须写 `127.0.0.1`**：`localhost` 会先试 `::1`，WSL mirrored 网络不转发 IPv6 回环，每次连接卡到超时
+- 后端连该库启动成功，0001–0013 迁移全部执行；新增 `repo/payout_test.go`（`TEST_DATABASE_URL` 门控）覆盖 `repo/payout.go` 全部 SQL（锁定计数、状态事件幂等、游标分页、`make_interval`、NULL JSONB 扫描），通过
+- 修 `activate_test.go` 清理不生效（`defer pool.Close()` 先于 `t.Cleanup` 执行，测试数据残留）
+- 本地 DSN 示例 `localhost` → `127.0.0.1`（config 默认值、README、AGENTS、activate_test 注释）
+- **待 Kaitchup 在本地 `deploy/.env` 填 5 个 `UPA_*`**，之后做接手步骤 3–5（API 冒烟 + 前端联调）
+
+## 2026-09-28 本地 API 冒烟（真实 UPay 测试环境，未确认任何汇款）
+
+测试账号 `payout-smoke@chl.local`（user 6，口令见本地 `docs/TEST-ACCOUNTS.md`，已开 `payout_enabled`，交易密码已设）。
+
+| 环节 | 结果 |
+|---|---|
+| `/me`、bootstrap、options（157 国）、白名单 403、无 token 401 | ✅ |
+| 上传 fileType=10（png 两张）、非法类型 422 | ✅ |
+| 建 payer（`Smoke Tester`）、重复 409、日期格式错 422 | ✅ UPay `payer/add` code=0 |
+| 建收款人：两步成功 / 第 2 步失败保留记录 / 重试只补第 2 步 | ✅（DE、GB 银行可建；US 银行被 #7 拦） |
+| 下单校验：金额越界、3 位小数、缺用途、收款人不存在 | ✅ 422 / 404 |
+| 下单 → ~1 秒到 `2` 出报价，倒计时 180 秒 | ✅（仅 US 收款人；DE / GB 下单 `8019`，#8） |
+| 报价未过期时重报价 409；过期后重报价 = 取消旧单 + 新建 | ✅ |
+| 交易密码：格式 422、重复设置 409、错 4 次 422（剩余次数）、第 5 次起 423 锁 30 分钟 | ✅ UPay `order/confirm` 调用 0 次 |
+| 取消 200、再取消 409、确认已取消订单 409 | ✅ |
+| 订单列表 / 详情（时间线） | ✅ |
+
+**修复**：建收款人 / 重试的响应返回的是内存对象（`created_at` 为零值、重试后 `last_error` 仍是旧错误）→ `addBank` 成功后重新读库（`service/payout.go`）。
+
+**发现的 UPay 问题**（已写入问题清单）：
+- **#6 扣款总额 / 手续费 / 到账金额字段为 `null`**（只有 `channelTotalAmount`、`paymentAmount` 有值，含义待确认）：确认页显示不了实付金额，**上线阻塞**
+- #7 IBAN 现在要求国家码与银行国家一致但仍必填 → 美国银行账户无法添加
+- #8 DE+USD、GB+USD 均 `8019` 未开放，且无接口查可用国家 → 测试环境目前新建不出能下单的收款人（本次借用 09-25 的 US bankAccount，本地收款人 id 5）
+- #9 报价过期后 `quote/info` 短时 500（一次）
+
+**未覆盖**：确认汇款（按约定不做）；UPay 真实回调推到本地（回调只推生产地址）；同步任务处理 3/5/6/10（需要已确认订单）；前端页面点测。
+
 ## 接手步骤
 
-1. `git checkout feature/payout`，确认工作区与上表一致（`git status`）。
+1. `git checkout feature/payout-followup`（或基于 `main` 新建），`git status` 查看未提交的跟进修改（见下方「2026-09-27 跟进」）。
 2. 按 Kaitchup 给的库启动后端（例）：
    ```bash
    cd backend
    # UPA_* 五项取自 deploy/.env（不入仓）；UPA_SECRET_KEY 含 $ ^ ( !，用单引号
-   DATABASE_URL=… JWT_SECRET=dev-secret PORT=8090 PAYOUT_SYNC_INTERVAL=15s \
+   DATABASE_URL="postgres://chl:chl@127.0.0.1:5432/chl?sslmode=disable" JWT_SECRET=dev-secret PORT=8090 PAYOUT_SYNC_INTERVAL=15s \
    UPA_HOST=https://openapi.upay-test.best UPA_API_KEY=… UPA_SECRET_KEY='…' \
    UPA_PLATFORM_PUBLIC_KEY=… UPA_MERCHANT_PRIVATE_KEY=… go run ./cmd/server
    ```

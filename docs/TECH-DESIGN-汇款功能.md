@@ -282,8 +282,9 @@ POST /api/payout/orders/:id/cancel
 **过期（实测 #14）**：
 - 前端倒计时到 0 → 禁用「确认汇款」，按钮变「重新获取报价」
 - 点击 → `POST /orders/:id/requote`。后端实现二选一：
-  - **首选**：调用 UPay 的重报价接口（**待 UPay 提供**），订单号不变，新报价出现后状态 12 → 前端刷新报价
-  - **兜底**（接口未提供前）：`CancelOrder(旧单)` + 用同样参数新建订单 → 返回新订单 id，前端跳到新订单的确认页
+  - **已实现**：`CancelOrder(旧单)` + 用同样参数新建订单 → 返回新订单 id，前端跳到新订单的确认页（报价失败 `4` 时直接新建）
+  - **不采用**「用过期报价调 confirm 被动触发重报价」（源码证实可行，见问题清单 #2）：若服务端认为报价仍有效（时钟差），这次调用会直接确认扣款
+  - UPay 若日后提供独立重报价接口，只改 `service.Requote`，前端不变
 - 后端 `/confirm` 也校验 `validUntil > now + 5s`，否则 `409 QUOTE_EXPIRED`（防止倒计时偏差）
 
 **确认**：
@@ -348,14 +349,14 @@ Content-Type: text/plain;  连接 / 读超时各 5s;  成功判定: HTTP 200 且
 | 方法 | 路径 | 请求 | 响应 `data` |
 |---|---|---|---|
 | GET | `/api/payout/bootstrap` | — | `{has_payer, payer_name, has_trade_password, debit_symbol, min_amount:"5", max_amount:"100000"}` |
-| GET | `/api/payout/options` | — | 国家列表、区号、证件类型、性别、有效期类型、职业状态、收入来源（来自存档表单 + 静态国家表） |
-| POST | `/api/payout/files` | multipart `file`（≤ 4MB，jpg/png/jpeg） | `{file_id}` |
+| GET | `/api/payout/options` | — | 国家列表（UPay `area/list`，内存缓存 24h，启动预热）、证件类型、性别、有效期类型、职业状态、收入来源；**无区号** |
+| POST | `/api/payout/files` | multipart `file`（≤ 10MB，jpg/jpeg/png/pdf；前端图片 > 4MB 先压缩） | `{file_id, file_name}` |
 | GET | `/api/payout/payer` | — | `{exists, name}` |
 | POST | `/api/payout/payer` | §7.2 | `{name}` |
 | GET | `/api/payout/recipients` | — | `[{id, name, swift_code, account_last4, currency, complete}]` |
 | POST | `/api/payout/recipients` | §7.3 | `{id, complete}` |
 | POST | `/api/payout/recipients/:id/retry` | — | `{id, complete}` |
-| GET | `/api/payout/recipients/:id` | — | 摘要 + 实时 `beneficiary/info`、`bank/account/info` 的展示字段 |
+| ~~GET~~ | ~~`/api/payout/recipients/:id`~~ | — | **未实现**：详情页只用本地摘要（名、姓、银行名、Swift、国家、后四位）；重试补银行时由后端读 `beneficiary/info` 取持卡人地址 |
 | POST | `/api/payout/orders` | `{recipient_id, amount, usage, note}` | `{id, status, stage}` |
 | GET | `/api/payout/orders` | `?before_id=&limit=20` | 列表：`{id, amount, currency, debit_total, recipient_name, stage, created_at}` |
 | GET | `/api/payout/orders/:id` | — | 详情 + `timeline:[{stage, at}]` + 报价快照 + 收款人展示字段 |
@@ -367,12 +368,12 @@ Content-Type: text/plain;  连接 / 读超时各 5s;  成功判定: HTTP 200 且
 
 `/api/me` 增加 `payout_enabled`。
 
-错误码（`error.code`）：`PAYOUT_NOT_ENABLED`、`PAYER_EXISTS`、`PAYER_REQUIRED`、`FILE_EXPIRED`、`VALIDATION`、`AMOUNT_OUT_OF_RANGE`、`QUOTE_EXPIRED`、`QUOTE_NOT_READY`、`TRADE_PASSWORD_NOT_SET`、`TRADE_PASSWORD_INVALID`（带 `remaining_attempts`）、`TRADE_PASSWORD_LOCKED`、`ORDER_NOT_CANCELABLE`、`UPSTREAM`（带 UPay `code/msg`，便于排障）。
+错误码（`error.code`）：`PAYOUT_NOT_ENABLED`、`PAYER_EXISTS`、`PAYER_REQUIRED`、`FILE_EXPIRED`、`VALIDATION`、`AMOUNT_OUT_OF_RANGE`、`QUOTE_EXPIRED`、`QUOTE_NOT_READY`、`TRADE_PASSWORD_NOT_SET`、`TRADE_PASSWORD_INVALID`（**HTTP 422**，带 `remaining_attempts`；不用 401，前端遇 401 会登出）、`TRADE_PASSWORD_LOCKED`、`ORDER_NOT_CANCELABLE`、`UPSTREAM`（带 UPay `code/msg`，便于排障）。
 
 ### 7.1 字段来源说明
 
 - **国家**：静态 ISO 3166-1 alpha-2 表（前端内置，中文名 + 代码），不调 `common/area/list`（只需国家一级）
-- **区号**：静态表，随国家默认联动，可改
+- **区号**：自由输入 `+` 加 1–4 位数字，后端正则校验（OpenAPI 无区号选项来源、`area/list` 无区号字段，见问题清单 #4）
 - **日期**：前端 `yyyy-MM-dd` → 后端转 UTC 0 点毫秒字符串（实测 #9）
 
 ### 7.2 付款人（6 步 KYC）字段映射
@@ -507,34 +508,35 @@ Content-Type: text/plain;  连接 / 读超时各 5s;  成功判定: HTTP 200 且
 ## 13. 施工清单
 
 ### 后端
-- [ ] `config`：`UPA_*`、`PAYOUT_*`，`PayoutEnabled()`
-- [ ] `upayopen/crypto.go`：签名 + JWE + key 解析，固定向量单测
-- [ ] `upayopen/client.go` + `payout.go`：通用 `call`、上传、一期接口
-- [ ] `upayopen/formdata.go` + 单测
-- [ ] `upayopen/webhook.go`：解密 + 双口径验签
-- [ ] 迁移 `0013_payout`
-- [ ] `repo/payout.go`
-- [ ] `middleware/payout.go`
-- [ ] `service/payout.go`：`ApplyOrderStatus`、`SyncOrder`、下单 / 确认 / 取消 / 重报价
-- [ ] `handler/payout.go`：bootstrap、options、files、payer、recipients、orders、trade-password
-- [ ] `handler/payout_webhook.go` + 路由 `/api/webhooks/upay-payout`
-- [ ] `job/payout_sync.go`，`main.go` 注册
-- [ ] `/api/me` 增加 `payout_enabled`；healthz 增加 payout 自检
-- [ ] `deploy/.env.example` 补变量
+- [x] `config`：`UPA_*`、`PAYOUT_*`，`PayoutEnabled()`
+- [x] `upayopen/crypto.go`：签名 + JWE + key 解析，固定向量单测
+- [x] `upayopen/client.go` + `payout.go`：通用 `call`、上传、一期接口
+- [x] `upayopen/formdata.go` + 单测
+- [x] `upayopen/webhook.go`：解密 + 验签（口径已由源码确定，无需双口径）
+- [x] 迁移 `0013_payout`
+- [x] `repo/payout.go`
+- [x] `middleware/payout.go`
+- [x] `service/payout.go`：`ApplyOrderStatus`、`SyncOrder`、下单 / 确认 / 取消 / 重报价
+- [x] `handler/payout.go`：bootstrap、options、files、payer、recipients、orders、trade-password
+- [x] `handler/payout_webhook.go` + 路由 `/api/webhooks/upay-payout`
+- [x] `job/payout_sync.go`，`main.go` 注册
+- [x] `/api/me` 增加 `payout_enabled`；healthz 增加 payout 自检
+- [x] `deploy/.env.example` 补变量
 
 ### 前端
-- [ ] `api/payout.ts`
-- [ ] `PayoutLayout`、`Stepper`、`CountryPicker`（含区号）、`ImageUpload`（压缩）、`Countdown`、`PinSheet`
-- [ ] KYC 6 步 + 完成页
-- [ ] 选择收款人、添加收款人（含未完成重试）
-- [ ] 金额与用途页
-- [ ] 确认页（报价轮询、倒计时、重报价、退款协议、PinSheet setup/verify）
-- [ ] 结果 / 详情页（时间线、tab、再转一笔）
-- [ ] 汇款记录列表；导航入口
+- [x] `api/payout.ts`
+- [x] `PayoutLayout`（含进度条）、`CountrySelect`、`ImageUpload`（压缩）、`useCountdown`、`PinSheet`（区号改为自由输入）
+- [x] KYC 6 步 + 完成页
+- [x] 选择收款人、添加收款人（含未完成重试）
+- [x] 金额与用途页
+- [x] 确认页（报价轮询、倒计时、重报价、退款协议、PinSheet setup/verify）
+- [x] 结果 / 详情页（时间线、tab、再转一笔）
+- [x] 汇款记录列表；导航入口
 
 ### 联调 / 上线
+- [ ] **本地连库端到端联调**（迁移、SQL、handler、前端）—— 未做，等 Kaitchup 提供本地库，见 [HANDOFF-汇款功能实现.md](HANDOFF-汇款功能实现.md)
 - [x] 回调地址提交 UPay 验证（2026-09-25 通过；最小版端点已上线，线上冒烟：正确签名 → SUCCESS，错误签名 → 401）
-- [ ] 测试环境真实确认一笔 20 USD，观察回调 → 固化验签口径（改 §6.4）
+- [~] ~~测试环境真实确认一笔 20 USD~~：Kaitchup 决定不做（已知可推进到 7）；验签口径已由源码固化（§6.4）
 - [ ] UPay 后台配置 IP 白名单
 - [ ] `UPDATE users SET payout_enabled = true WHERE email = …`
 - [ ] 回填 §12 各项答复

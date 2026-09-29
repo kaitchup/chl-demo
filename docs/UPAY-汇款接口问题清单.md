@@ -1,6 +1,6 @@
 # UPay 汇款（Payout）接口问题清单
 
-> 2026-09-25 · 测试环境 `https://openapi.upay-test.best` · 商户 10103（puppy）
+> 2026-09-25 · 2026-09-28 补充 #6–#9 · 测试环境 `https://openapi.upay-test.best` · 商户 10103（puppy）
 > 用途：与 UPay 逐条确认。每条附请求 / 响应原文，确认后在「结论」处填写，并同步到 [TECH-DESIGN-汇款功能.md](TECH-DESIGN-汇款功能.md) §0 / §12。
 > 说明：API Key 已打码；签名 60 秒过期，原文可直接转给 UPay。
 
@@ -11,6 +11,10 @@
 | 3 | KYC 材料上传的 `fileType`：10 报格式错，37 报参数错 | 付款人证件、地址证明无法按规范上传 | ✅ 已修复（2026-09-25 13:27 复测通过，应传 10） |
 | 4 | 银行账户币种选项缺失 | 添加收款人时无法给出币种列表 | 🔴 已定位：OpenAPI 分支不下发币种（及区号）选项，也无替代接口，待 UPay 修复 |
 | 5 | 🐞 已取消订单可被 `confirm` 复活 | 已取消订单可能被重新确认并扣款 | 🔴 已实测复现，待 UPay 修复 |
+| 6 | 🐞 `quote/info` 扣款总额 / 手续费 / 到账金额字段为 `null` | 确认页无法显示扣款总额、手续费、到账金额，**不能上线** | 🔴 2026-09-28 实测，待 UPay 确认 / 修复 |
+| 7 | IBAN 现在校验国家码，但仍必填 | 非 IBAN 国家（如美国）的银行账户无法添加 | 🔴 2026-09-28 实测（与附 A 结论相反），待 UPay 答复 |
+| 8 | 多数「国家 + 币种」未开放（`8019`），且无接口可查 | 用户能加收款人，但永远下不了单 | ⬜ 待 UPay 提供开放清单或查询接口 |
+| 9 | 报价过期后 `quote/info` 短时返回 `500` | 期间无法查看报价 / 重新报价 | ⬜ 仅观察到一次，请 UPay 查日志 |
 
 ---
 
@@ -348,11 +352,96 @@ POST https://openapi.upay-test.best/api/v1/payout/order/confirm
 
 ---
 
+## 6. 🐞 `quote/info` 的扣款总额 / 手续费 / 到账金额字段为 `null`（2026-09-28）
+
+**现象**：订单下单成功、约 1 秒进入状态 `2`，报价状态 `3`（可用），但 `debitAmount`、`debitCoin`、`destinationAmount`、`destinationCurrency`、`fixedFee`、`transactionFee`、`exchangeFee`、`remitMethod` 为 `null`。有值的金额字段只有 `channelTotalAmount=103.06` 和文档未列的 `paymentAmount=68.13`，两者都不是扣款总额（含手续费）。2026-09-25 同一接口 `debitAmount`、`fixedFee` 等都有值（见 #2 的响应原文）。
+
+**订单**：`thirdOrderNo=POMUKVD8YG5604C52D0583`，`orderNo=2026092802104458959756312576`，68.06 USD / Swift，bankAccount `2103372468649005056`
+
+**请求**：`POST /api/v1/payout/order/quote/info`，明文参数 `{"thirdOrderNo":"POMUKVD8YG5604C52D0583"}`
+
+**响应**（解密后，2026-09-28 10:31 UTC+4）：
+
+```json
+{"crateAt":null,"orderNo":"2026092802104458959756312576","status":2,
+ "quoteList":[{"batchNo":"QB1790577089638d338bc4af224","channelCurrency":"USD","channelTotalAmount":"103.06",
+   "debitAmount":null,"debitCoin":null,"destinationAmount":null,"destinationCurrency":null,
+   "exchangeFee":null,"feeCurrency":"USDT","fixedFee":null,"kycUrl":null,"paymentAmount":"68.13",
+   "quoteId":"293","quoteNo":"Q1790577089645ef72480e4bea","quoteTime":"1790577090000","remitMethod":null,
+   "remitMethodName":null,"status":3,"statusName":null,"transactionFee":null,"validUntil":"1790577270000"}],
+ "thirdOrderNo":"POMUKVD8YG5604C52D0583"}
+```
+
+**源码对照**：本地 `upay-payout-server`（`main`，2026-09-27）`PayoutOrderServiceImpl.convertQuoteInfo:365` 仍把 `sourceAmount`→`debitAmount`、`fixedFeeAmount`→`fixedFee` 等映射出来，且没有 `paymentAmount`；测试环境部署的版本与之不同。按内部 DTO `PayoutQuoteRes` 的注释，`paymentAmount` =「不含手续费的稳定币本金」。
+
+**影响**：我方确认页的「扣款总额 / 手续费 / 到账金额」全部为空，用户无法知道要付多少，**必须修复后才能上线**。
+
+**请 UPay 确认 / 修复**
+- [ ] 这些字段为 `null` 是否为回归缺陷；恢复后字段名是否保持不变
+- [ ] 如字段改名：扣款总额（含全部手续费）、各项手续费、到账金额分别取哪个字段；`paymentAmount`、`channelTotalAmount` 的含义与币种
+
+**结论**：
+
+---
+
+## 7. IBAN 现在校验国家码，但仍必填 —— 非 IBAN 国家无法添加银行账户（2026-09-28）
+
+**现象**：美国银行（`bank_country=US`）+ 英国 IBAN 调 `bank/account/add`，返回 `8002 The country code in IBAN must match 银行国家.`（requestId `74d81737943de26db7219217c75e8dc0`）。2026-09-25 同样的组合可以创建（附 A）。
+
+**源码**：`PayoutIbanValidator.validate` —— IBAN 非空时校验格式、校验位，并要求 IBAN 国家码 = 银行国家；IBAN 为空则跳过。但 2026-09-25 实测不传 IBAN 返回 `8002 IBAN is required`（表单配置为必填）。
+
+**影响**：两条规则叠加后，美国等没有 IBAN 的国家的银行账户无法添加。
+
+**请 UPay 确认**
+- [ ] 表单里 IBAN 是否已改为按国家可选；若是，我方去掉 IBAN 必填（后端 `reIBAN` 校验 + 前端表单）
+
+**结论**：
+
+---
+
+## 8. 多数「国家 + 币种」未开放汇款（`8019`），且没有查询接口（2026-09-28）
+
+**现象**：收款人、银行账户都能创建成功，但下单返回 `8019`：
+
+| 银行国家 + 币种 | 响应 | requestId |
+|---|---|---|
+| DE + USD | `8019 Germany USD remittance is currently unavailable` | `b5c6d513aad7762ecc83427f8587c0bb` |
+| GB + USD | `8019 United Kingdom USD remittance is currently unavailable` | `98f594ca6741c35cf72f41f1016cb8b0` |
+| US + USD | ✅ 下单成功（用 09-25 创建的 bankAccount `2103372468649005056`） | — |
+
+**源码**：`PayoutOrderServiceImpl.validAmountRange:293` 按 (国家, 币种, swift) 查 `payout_provider_capability`，查不到限额即 `PO_REMIT_LIMIT_NOT_CONFIG(8019)`；金额范围也来自这张表（我方目前写死 5 ~ 100000，见附 B）。
+
+**影响**：用户可以添加一个永远无法汇款的收款人；结合 #7，测试环境目前**无法新建任何能下单的收款人**。
+
+**请 UPay 提供**
+- [ ] 测试 / 生产环境已开放的「国家 + 币种」清单及各自金额范围
+- [ ] 最好有 OpenAPI 查询接口，让添加收款人时只列出可用国家
+
+**结论**：
+
+---
+
+## 9. 报价刚过期时 `quote/info` 短时返回 `500 Service deviation`（2026-09-28，仅一次）
+
+**订单**：`thirdOrderNo=POMUKVD8YG5604C52D0583`，报价 `validUntil=1790577270000`（10:34:30 UTC+4）
+
+**现象**：10:34:59 – 10:35:16 之间连续 10 次 `quote/info` 返回 `code=500 msg=Service deviation`；10:35:53 恢复，返回已过期的原报价。
+
+requestId：`d395b0b3f2db367a2df3bc63200d81fd`、`8f835f684900510a9686c9a07d3526a1`、`219a9e426ae21e88f250605f2355f1d7`、`37c1de98550a8651be1188dcd70e8ae2`、`87894aac3a77a17d63fb6d28137b86cf`、`ca42d5d03396d36a0861e9621312b206`、`6326f40e8480ba22febb4cebfbfee2af`、`6047adac2cd59e5d461924ea10930777`、`f8628c65792be42b712752f8ec1665fa`、`717ee31b49c746958598f7cb55aab7da`
+
+**影响**：这段时间我方「查看报价」和「重新报价」都返回 502（重新报价会先查报价）。
+
+**请 UPay 查日志**：这是否与报价过期后的内部处理有关，是否会复现。
+
+**结论**：
+
+---
+
 ## 附：其他已发现的差异（顺带确认，非阻塞）
 
 | # | 差异 | 实测 | 当前处理 |
 |---|---|---|---|
-| A | IBAN 对非 IBAN 国家（如美国）也必填 | 不传返回 `8002 IBAN is required`；传英国 IBAN + 美国银行也能创建（不校验国家） | UI 必填；请确认是否应按国家可选 |
+| A | IBAN 对非 IBAN 国家（如美国）也必填 | 不传返回 `8002 IBAN is required`；~~传英国 IBAN + 美国银行也能创建（不校验国家）~~ 2026-09-28 起已校验国家码，见 #7 | UI 必填；请确认是否应按国家可选 |
 | B | 汇款金额下限 | 文档写最小 0.01；实测 2 USD 返回 `8009 Remittance amount exceeds the limit, allowed range: 5 ~ 100000` | 按 5 ~ 100000 校验；请更新文档 |
 | C | `debitCoinId` 取值 | 文档示例 `"USDT"`；`debit/coin/list` 实际返回 `{"coinId":"458884","symbol":"USDT"}` | 传数字 ID |
 | D | 下单后 `orderStatus=0` | 文档状态枚举从 1 开始 | 按「报价中」处理；请补充文档 |

@@ -527,7 +527,8 @@ func (s *PayoutService) addBank(ctx context.Context, rec repo.PayoutRecipient, h
 	if err := s.repo.SetRecipientBank(ctx, rec); err != nil {
 		return rec, err
 	}
-	return rec, nil
+	// Re-read so the response carries created_at and the cleared last_error.
+	return s.repo.GetPayoutRecipient(ctx, rec.UserID, rec.ID)
 }
 
 // RetryRecipientBank re-runs step 2. The full account number / IBAN are not

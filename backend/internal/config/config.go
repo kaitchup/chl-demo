@@ -137,7 +137,7 @@ func Load() Config {
 		payoutSync = 60 * time.Second
 	}
 	return Config{
-		DatabaseURL:             env("DATABASE_URL", "postgres://chl:chl@localhost:5432/chl?sslmode=disable"),
+		DatabaseURL:             env("DATABASE_URL", "postgres://chl:chl@127.0.0.1:5432/chl?sslmode=disable"),
 		JWTSecret:               env("JWT_SECRET", "dev-secret-change-me"),
 		JWTTTL:                  ttl,
 		PublicBaseURL:           env("PUBLIC_BASE_URL", "http://localhost"),

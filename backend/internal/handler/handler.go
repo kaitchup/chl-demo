@@ -47,7 +47,7 @@ func fail(c echo.Context, status int, code, msg string) error {
 
 func (h *Handler) Health(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{
-		"ok": true, "version": "0.0.2", "upay_enabled": h.cfg.UpayEnabled(),
+		"ok": true, "version": "0.0.2", "upay_enabled": h.cfg.UpayEnabled(), "payout_enabled": h.cfg.PayoutEnabled(),
 	})
 }
 

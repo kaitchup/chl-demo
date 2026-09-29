@@ -38,7 +38,7 @@ chl-demo/
 后端在 **:8090**（`PORT` 可配；本地用 8090 因宿主 nginx 默认占了 8080）：
 ```bash
 cd backend
-DATABASE_URL="postgres://postgres:postgres@localhost:5432/chl?sslmode=disable" \
+DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5432/chl?sslmode=disable" \
 JWT_SECRET=dev-secret PUBLIC_BASE_URL=http://localhost:8088 PORT=8090 go run ./cmd/server
 ```
 前端经宿主 nginx（`/opt/homebrew/etc/nginx/servers/chl.conf`）在 **:8088** 提供静态 `frontend/dist`，`/api/`→8090。

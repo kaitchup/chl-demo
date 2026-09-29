@@ -40,7 +40,7 @@ createdb chl   # 或 psql -c "CREATE DATABASE chl;"
 后端：
 ```bash
 cd backend
-export DATABASE_URL="postgres://postgres:postgres@localhost:5432/chl?sslmode=disable"
+export DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5432/chl?sslmode=disable"
 export JWT_SECRET="dev-secret"
 export PUBLIC_BASE_URL="http://localhost:5173"
 go run ./cmd/server          # 启动时自动迁移 + 灌入套餐，监听 :8080

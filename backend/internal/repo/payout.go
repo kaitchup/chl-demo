@@ -286,7 +286,7 @@ func (r *Repo) GetPayoutOrderByOrderNo(ctx context.Context, orderNo string) (Pay
 func (r *Repo) ListPayoutOrders(ctx context.Context, userID, beforeID int64, limit int) ([]PayoutOrder, bool, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT `+orderCols+` FROM payout_orders
-		 WHERE user_id=$1 AND ($2 = 0 OR id < $2) AND order_no IS NOT NULL
+		 WHERE user_id=$1 AND ($2::bigint = 0 OR id < $2::bigint) AND order_no IS NOT NULL
 		 ORDER BY id DESC LIMIT $3`, userID, beforeID, limit+1)
 	if err != nil {
 		return nil, false, err
